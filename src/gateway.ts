@@ -59,6 +59,20 @@ async function ensureConfig(): Promise<void> {
     } catch {}
   }
 
+  // Set browser executable path to Playwright Chromium
+  try {
+    const pwBase = "/root/.cache/ms-playwright";
+    const dirs = fs.readdirSync(pwBase).filter(d => d.startsWith("chromium-"));
+    if (dirs.length > 0) {
+      const chromePath = `${pwBase}/${dirs[0]}/chrome-linux64/chrome`;
+      if (fs.existsSync(chromePath)) {
+        await runCmd("openclaw", ["config", "set", "browser.executablePath", chromePath]);
+        await runCmd("openclaw", ["config", "set", "browser.headless", "true"]);
+        await runCmd("openclaw", ["config", "set", "browser.noSandbox", "true"]);
+      }
+    }
+  } catch {}
+
   // Sync gateway tokens
   await runCmd("openclaw", ["config", "set", "gateway.auth.mode", "token"]);
   await runCmd("openclaw", [
