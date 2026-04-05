@@ -27,10 +27,6 @@ Deploy your own AI agent in minutes. Click the button, follow the steps, talk to
 3. Click **"Start setup"** — this opens an interactive terminal in your browser
 4. Follow the prompts to choose an AI provider, add channels, and configure your bot
 
-The setup wizard will guide you through everything — no CLI or SSH needed.
-
-5. After setup completes, click **"Onboarding complete"** to start the gateway
-
 <details>
 <summary><strong>Answers for quick setup</strong></summary>
 
@@ -56,6 +52,8 @@ The setup wizard will guide you through everything — no CLI or SSH needed.
 11. **Hatch your bot** → Do this later
 
 </details>
+
+5. After setup completes, click **"Onboarding complete"** to start the gateway
 
 ## Step 3 — Approve devices
 
