@@ -57,9 +57,9 @@ Deploy your own AI agent in minutes. Click the button, follow the steps, talk to
 
 ## Step 3 — Approve devices
 
-1. Click **"Open Web UI"** link on the setup page (creates a pairing request)
+1. Click **"Open Web UI"** link on the setup page (creates a pairing request), then come back
 2. **Telegram:** Open your bot in Telegram → click **Start** → it shows a pairing code. Enter the code on the setup page → click **Approve**
-3. Come back to the setup page → click **"Refresh pending devices"** → click **Approve**
+3. Click **"Refresh pending devices"** → click **Approve**
 
 ## Step 4 — Talk to your bot (you're done!)
 
