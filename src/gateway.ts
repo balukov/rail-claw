@@ -1,6 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
 import {
   STATE_DIR,
   WORKSPACE_DIR,
@@ -60,58 +59,20 @@ async function ensureConfig(): Promise<void> {
     } catch {}
   }
 
-  // Auto-detect Playwright Chromium and configure browser plugin
-  try {
-    const pwBase = process.env.PLAYWRIGHT_BROWSERS_PATH || "/home/node/.cache/ms-playwright";
-    const dirs = fs.readdirSync(pwBase)
-      .filter(d => d.startsWith("chromium-"))
-      .sort()
-      .reverse(); // prefer latest version
-
-    let chromePath: string | null = null;
-    for (const dir of dirs) {
-      // Playwright uses chrome-linux64 on newer versions, chrome-linux on older
-      for (const sub of ["chrome-linux64/chrome", "chrome-linux/chrome"]) {
-        const candidate = `${pwBase}/${dir}/${sub}`;
-        if (fs.existsSync(candidate)) {
-          chromePath = candidate;
-          break;
-        }
-      }
-      if (chromePath) break;
-    }
-
-    if (chromePath) {
-      await runCmd("openclaw", [
-        "config", "set", "--json", "browser",
-        JSON.stringify({
-          enabled: true,
-          executablePath: chromePath,
-          headless: true,
-          noSandbox: true,
-          defaultProfile: "openclaw",
-          extraArgs: [
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--disable-extensions",
-            "--disable-background-networking",
-            "--disable-default-apps",
-            "--disable-sync",
-            "--disable-translate",
-            "--no-first-run",
-            "--disable-backgrounding-occluded-windows",
-            "--disable-renderer-backgrounding",
-            "--js-flags=--max-old-space-size=512",
-          ],
-        }),
-      ]);
-      console.log(`[gateway] browser configured: ${chromePath}`);
-    } else {
-      console.warn("[gateway] Chromium not found, browser plugin disabled");
-    }
-  } catch (err) {
-    console.warn("[gateway] browser auto-detect failed:", err);
-  }
+  // Enable browser plugin — OpenClaw auto-detects system chromium
+  await runCmd("openclaw", [
+    "config", "set", "--json", "browser",
+    JSON.stringify({
+      enabled: true,
+      headless: true,
+      noSandbox: true,
+      defaultProfile: "openclaw",
+      extraArgs: [
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
+    }),
+  ]);
 
   // Trust loopback proxy so Railway-forwarded requests are treated as local
   await runCmd("openclaw", [
