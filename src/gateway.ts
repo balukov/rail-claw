@@ -112,6 +112,15 @@ async function ensureConfig(): Promise<void> {
     JSON.stringify(["127.0.0.1", "::1"]),
   ]);
 
+  // Railway terminates TLS at the edge and proxies to the container over HTTP.
+  // The gateway must allow token auth over the insecure loopback connection.
+  await runCmd("openclaw", [
+    "config",
+    "set",
+    "gateway.controlUi.allowInsecureAuth",
+    "true",
+  ]);
+
   // Sync gateway tokens
   await runCmd("openclaw", ["config", "set", "gateway.auth.mode", "token"]);
   await runCmd("openclaw", [
