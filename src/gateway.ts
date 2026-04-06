@@ -61,7 +61,7 @@ async function ensureConfig(): Promise<void> {
 
   // Auto-detect Playwright Chromium and configure browser plugin
   try {
-    const pwBase = process.env.PLAYWRIGHT_BROWSERS_PATH || "/root/.cache/ms-playwright";
+    const pwBase = process.env.PLAYWRIGHT_BROWSERS_PATH || "/home/node/.cache/ms-playwright";
     const dirs = fs.readdirSync(pwBase).filter(d => d.startsWith("chromium-"));
     if (dirs.length > 0) {
       const chromePath = `${pwBase}/${dirs[0]}/chrome-linux64/chrome`;

@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.DS_Store
+.tmpdata
+*.md
+LICENSE
+snapclaw-logo.png
+railway.toml
+.claude
+.env*
