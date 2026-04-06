@@ -3,10 +3,12 @@ services:
     build: .
     ports:
       - "3000:3000"
+    shm_size: "2gb"
     environment:
       - PORT=3000
       - OPENCLAW_STATE_DIR=/data/.openclaw
       - OPENCLAW_WORKSPACE_DIR=/data/workspace
+      - PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
     volumes:
       - snapclaw-data:/data
     restart: unless-stopped

@@ -34,13 +34,15 @@ RUN apt-get update \
 # Install OpenClaw globally
 RUN npm install -g openclaw@latest
 
-# Install Playwright Chromium system deps
+# Install Playwright Chromium system deps (needed for headless Chrome in Docker)
 RUN npx playwright install-deps chromium \
   && rm -rf /var/lib/apt/lists/*
 
-# Install Chromium browser binary (non-root path)
+# Install Chromium browser binary via OpenClaw's bundled playwright-core.
+# Dynamically locate the CLI to survive openclaw version changes.
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
-RUN node /usr/local/lib/node_modules/openclaw/node_modules/playwright-core/cli.js install chromium \
+RUN PW_CLI=$(node -e "try{console.log(require.resolve('playwright-core/cli',{paths:['/usr/local/lib/node_modules/openclaw']}))}catch{process.exit(1)}") \
+  && node "$PW_CLI" install chromium \
   && chown -R node:node /home/node/.cache
 
 WORKDIR /app

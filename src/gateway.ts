@@ -62,23 +62,46 @@ async function ensureConfig(): Promise<void> {
   // Auto-detect Playwright Chromium and configure browser plugin
   try {
     const pwBase = process.env.PLAYWRIGHT_BROWSERS_PATH || "/home/node/.cache/ms-playwright";
-    const dirs = fs.readdirSync(pwBase).filter(d => d.startsWith("chromium-"));
-    if (dirs.length > 0) {
-      const chromePath = `${pwBase}/${dirs[0]}/chrome-linux64/chrome`;
-      if (fs.existsSync(chromePath)) {
-        await runCmd("openclaw", [
-          "config", "set", "--json", "browser",
-          JSON.stringify({
-            enabled: true,
-            executablePath: chromePath,
-            headless: true,
-            noSandbox: true,
-            defaultProfile: "openclaw",
-          }),
-        ]);
+    const dirs = fs.readdirSync(pwBase)
+      .filter(d => d.startsWith("chromium-"))
+      .sort()
+      .reverse(); // prefer latest version
+
+    let chromePath: string | null = null;
+    for (const dir of dirs) {
+      // Playwright uses chrome-linux64 on newer versions, chrome-linux on older
+      for (const sub of ["chrome-linux64/chrome", "chrome-linux/chrome"]) {
+        const candidate = `${pwBase}/${dir}/${sub}`;
+        if (fs.existsSync(candidate)) {
+          chromePath = candidate;
+          break;
+        }
       }
+      if (chromePath) break;
     }
-  } catch {}
+
+    if (chromePath) {
+      await runCmd("openclaw", [
+        "config", "set", "--json", "browser",
+        JSON.stringify({
+          enabled: true,
+          executablePath: chromePath,
+          headless: true,
+          noSandbox: true,
+          defaultProfile: "openclaw",
+          extraArgs: [
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+          ],
+        }),
+      ]);
+      console.log(`[gateway] browser configured: ${chromePath}`);
+    } else {
+      console.warn("[gateway] Chromium not found, browser plugin disabled");
+    }
+  } catch (err) {
+    console.warn("[gateway] browser auto-detect failed:", err);
+  }
 
   // Trust loopback proxy so Railway-forwarded requests are treated as local
   await runCmd("openclaw", [
