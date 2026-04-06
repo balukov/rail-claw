@@ -15,8 +15,7 @@ RUN npx -y playwright install-deps chromium \
 
 # Install Chromium via bundled Playwright CLI (avoids npm override conflicts)
 ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
-RUN node /usr/lib/node_modules/openclaw/node_modules/playwright-core/cli.js install chromium \
-  || npx -y playwright install chromium
+RUN node /usr/lib/node_modules/openclaw/node_modules/playwright-core/cli.js install chromium
 
 WORKDIR /app
 
