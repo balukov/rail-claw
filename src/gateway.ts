@@ -92,7 +92,6 @@ async function ensureConfig(): Promise<void> {
           extraArgs: [
             "--disable-dev-shm-usage",
             "--disable-gpu",
-            "--single-process",
             "--disable-extensions",
             "--disable-background-networking",
             "--disable-default-apps",
@@ -101,8 +100,7 @@ async function ensureConfig(): Promise<void> {
             "--no-first-run",
             "--disable-backgrounding-occluded-windows",
             "--disable-renderer-backgrounding",
-            "--disable-ipc-flooding-protection",
-            "--js-flags=--max-old-space-size=256",
+            "--js-flags=--max-old-space-size=512",
           ],
         }),
       ]);
