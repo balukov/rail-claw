@@ -153,6 +153,19 @@
       <p class="muted" style="margin-top:1.5rem">Or message your bot in Telegram, Discord, or any channel you configured.</p>
     </div>
   </div>
+
+  <div id="dashboard" style="display:none">
+    <div class="card" style="margin-bottom:1rem">
+      <div class="term-controls">
+        <button id="dashShell">Open terminal</button>
+        <button id="dashRestart" class="btn-secondary">Restart gateway</button>
+      </div>
+      <div id="dashTermContainer" style="display:none">
+        <div id="dashTerminalContainer" style="border-radius:12px;overflow:hidden;background:#0c0e14;border:1px solid var(--border)"><div id="dashTerminal"></div></div>
+      </div>
+      <pre id="dashOutput" style="display:none"></pre>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>

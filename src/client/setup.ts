@@ -265,9 +265,99 @@ function stopPolling(): void {
   }
 }
 
+// --- Dashboard (shown when already configured) ---
+
+let dashTerm: InstanceType<typeof Terminal> | null = null;
+let dashWs: WebSocket | null = null;
+let dashFit: ReturnType<typeof FitAddon.FitAddon.prototype.constructor> | null = null;
+
+function showDashboard(): void {
+  $("wizardProgress").style.display = "none";
+  document.querySelectorAll(".wizard-card").forEach((el) => {
+    (el as HTMLElement).style.display = "none";
+  });
+  $("dashboard").style.display = "block";
+}
+
+function connectDashTerminal(): void {
+  if (dashWs && dashWs.readyState <= WebSocket.OPEN) return;
+
+  $("dashTermContainer").style.display = "block";
+
+  if (!dashTerm) {
+    dashTerm = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: "JetBrains Mono, monospace",
+      theme: {
+        background: "#0c0e14",
+        foreground: "#e8e6e3",
+        cursor: "#e85d3a",
+        selectionBackground: "rgba(232,93,58,0.25)",
+      },
+      convertEol: true,
+    });
+    dashFit = new FitAddon.FitAddon();
+    dashTerm.loadAddon(dashFit);
+    dashTerm.open($("dashTerminal"));
+    dashFit.fit();
+    window.addEventListener("resize", () => dashFit?.fit());
+  }
+
+  dashTerm.clear();
+  dashTerm.writeln("\x1b[1;32mConnecting...\x1b[0m\r\n");
+
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  httpJson<{ token: string }>("/setup/api/terminal-token")
+    .then((j) => {
+      const url = `${proto}//${location.host}/setup/terminal?token=${encodeURIComponent(j.token)}`;
+      dashWs = new WebSocket(url);
+
+      dashWs.onopen = () => {
+        dashTerm!.writeln("\x1b[1;32mConnected!\x1b[0m\r\n");
+        const dims = dashFit!.proposeDimensions();
+        if (dims)
+          dashWs!.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
+      };
+      dashWs.onmessage = (e: MessageEvent) => dashTerm!.write(e.data as string);
+      dashWs.onclose = () => dashTerm!.writeln("\r\n\x1b[1;33mDisconnected.\x1b[0m");
+      dashWs.onerror = () => dashTerm!.writeln("\r\n\x1b[1;31mConnection error.\x1b[0m");
+      dashTerm!.onData((d: string) => {
+        if (dashWs && dashWs.readyState === WebSocket.OPEN) dashWs.send(d);
+      });
+      dashTerm!.onResize((s: { cols: number; rows: number }) => {
+        if (dashWs && dashWs.readyState === WebSocket.OPEN)
+          dashWs.send(JSON.stringify({ type: "resize", cols: s.cols, rows: s.rows }));
+      });
+    })
+    .catch((e: Error) => dashTerm!.writeln(`\x1b[1;31mFailed: ${e}\x1b[0m`));
+}
+
+$("dashShell").onclick = () => connectDashTerminal();
+$("dashRestart").onclick = async () => {
+  const out = $("dashOutput");
+  out.style.display = "block";
+  out.textContent = "Restarting gateway...";
+  try {
+    const r = await httpJson<{ output: string }>("/setup/api/console/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cmd: "gateway.restart", arg: "" }),
+    });
+    out.textContent = r.output ?? "Gateway restarted.";
+    await refreshStatus();
+  } catch (e) {
+    out.textContent = `Error: ${e}`;
+  }
+};
+
 // --- Init ---
 
 refreshStatus().then(() => {
-  goToStep(isConfigured ? 2 : 1);
-  if (!isConfigured) startPolling();
+  if (isConfigured) {
+    showDashboard();
+  } else {
+    goToStep(1);
+    startPolling();
+  }
 });
