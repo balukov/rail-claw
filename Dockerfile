@@ -36,10 +36,7 @@ RUN apt-get update \
     tini gosu ${EXTRA_APT_PACKAGES} \
   && rm -rf /var/lib/apt/lists/*
 
-# Pin openclaw version for reproducibility
-ARG OPENCLAW_VERSION=2026.4.8
-RUN npm install -g openclaw@${OPENCLAW_VERSION} \
-  && npm install -g grammy @grammyjs/runner @buape/carbon
+RUN npm install -g openclaw@latest
 
 # Install Playwright Chromium + system deps (using openclaw's bundled playwright-core)
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
