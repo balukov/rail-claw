@@ -74,6 +74,31 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
   return JSON.parse(body.toString("utf8"));
 }
 
+// --- Channel readiness ---
+
+let channelsReady = false;
+
+async function checkChannelsReady(): Promise<boolean> {
+  try {
+    const cfg = readConfig();
+    const plugins = (cfg as Record<string, unknown>)?.plugins as Record<string, unknown> | undefined;
+    const entries = plugins?.entries as Record<string, unknown> | undefined;
+    if (entries && Object.keys(entries).some(k => ["telegram", "discord", "whatsapp"].includes(k))) {
+      channelsReady = true;
+      return true;
+    }
+  } catch {}
+  // Fallback: check via CLI
+  try {
+    const r = await runCmd("openclaw", ["channels", "list"], 10_000);
+    if (r.code === 0 && r.output.toLowerCase().match(/telegram|discord|whatsapp/)) {
+      channelsReady = true;
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 // --- Auto-configure helpers ---
 
 async function applyPostSetupConfig(): Promise<void> {
@@ -200,7 +225,7 @@ async function handleRequest(
   const method = req.method ?? "GET";
 
   // Health check — no auth
-  if (url === "/healthz" || url === "/setup/healthz") {
+  if (url === "/healthz" || url === "/snapclaw/healthz") {
     return sendJson(res, { ok: true });
   }
 
@@ -210,21 +235,21 @@ async function handleRequest(
   }
 
   // --- Setup routes (require auth) ---
-  if (url.startsWith("/setup")) {
+  if (url.startsWith("/snapclaw")) {
     if (!checkBasicAuth(req)) return sendAuth(res);
 
     // Setup page
-    if (url === "/setup" && method === "GET") {
+    if (url === "/snapclaw" && method === "GET") {
       return sendFile(res, path.join(publicDir, "setup.html"), "text/html");
     }
 
     // Frontend JS
-    if (url === "/setup/setup.js" && method === "GET") {
+    if (url === "/snapclaw/setup.js" && method === "GET") {
       return sendFile(res, path.join(publicDir, "setup.js"), "application/javascript");
     }
 
     // API: status
-    if (url === "/setup/api/status" && method === "GET") {
+    if (url === "/snapclaw/api/status" && method === "GET") {
       const r = await runCmd("openclaw", ["--version"]);
       return sendJson(res, {
         ok: true,
@@ -235,7 +260,7 @@ async function handleRequest(
     }
 
     // API: codex OAuth start
-    if (url === "/setup/api/codex/start" && method === "POST") {
+    if (url === "/snapclaw/api/codex/start" && method === "POST") {
       const r = await runCmd("openclaw", [
         "onboard",
         "--non-interactive",
@@ -263,7 +288,7 @@ async function handleRequest(
     }
 
     // API: codex OAuth callback
-    if (url === "/setup/api/codex/callback" && method === "POST") {
+    if (url === "/snapclaw/api/codex/callback" && method === "POST") {
       const body = await readJson(req);
       const redirectUrl = String(body.redirectUrl ?? "").trim();
       if (!redirectUrl) {
@@ -279,7 +304,7 @@ async function handleRequest(
     }
 
     // API: telegram add
-    if (url === "/setup/api/telegram/add" && method === "POST") {
+    if (url === "/snapclaw/api/telegram/add" && method === "POST") {
       const body = await readJson(req);
       const token = String(body.token ?? "").trim();
       if (!token || !/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
@@ -289,20 +314,21 @@ async function handleRequest(
         "channels", "add", "--channel", "telegram", "--token", token,
       ]);
       if (r.code === 0) {
+        channelsReady = true;
         await gateway.restart();
       }
       return sendJson(res, { ok: r.code === 0, output: redactSecrets(r.output) });
     }
 
     // API: telegram verify
-    if (url === "/setup/api/telegram/verify" && method === "GET") {
+    if (url === "/snapclaw/api/telegram/verify" && method === "GET") {
       const r = await runCmd("openclaw", ["channels", "list"]);
       const hasTelegram = r.output.toLowerCase().includes("telegram");
       return sendJson(res, { ok: true, connected: hasTelegram, output: redactSecrets(r.output) });
     }
 
     // API: terminal token
-    if (url === "/setup/api/terminal-token" && method === "GET") {
+    if (url === "/snapclaw/api/terminal-token" && method === "GET") {
       const token = crypto.randomBytes(24).toString("hex");
       terminalTokens.set(token, Date.now() + 60_000);
       // Clean expired
@@ -313,7 +339,7 @@ async function handleRequest(
     }
 
     // API: config read
-    if (url === "/setup/api/config/raw" && method === "GET") {
+    if (url === "/snapclaw/api/config/raw" && method === "GET") {
       const p = configPath();
       let content = "";
       let exists = false;
@@ -325,7 +351,7 @@ async function handleRequest(
     }
 
     // API: config write
-    if (url === "/setup/api/config/raw" && method === "POST") {
+    if (url === "/snapclaw/api/config/raw" && method === "POST") {
       const body = await readJson(req);
       const content = String(body.content ?? "");
       if (content.length > 500_000) {
@@ -345,7 +371,7 @@ async function handleRequest(
     }
 
     // API: trigger auto-onboard (if not yet configured)
-    if (url === "/setup/api/onboard" && method === "POST") {
+    if (url === "/snapclaw/api/onboard" && method === "POST") {
       if (isConfigured()) {
         return sendJson(res, { ok: true, output: "Already configured." });
       }
@@ -357,7 +383,7 @@ async function handleRequest(
     }
 
     // API: console
-    if (url === "/setup/api/console/run" && method === "POST") {
+    if (url === "/snapclaw/api/console/run" && method === "POST") {
       const body = await readJson(req);
       const cmd = String(body.cmd ?? "");
       const arg = String(body.arg ?? "").trim();
@@ -427,7 +453,7 @@ async function handleRequest(
     }
 
     // API: pairing approve
-    if (url === "/setup/api/pairing/approve" && method === "POST") {
+    if (url === "/snapclaw/api/pairing/approve" && method === "POST") {
       const body = await readJson(req);
       const channel = String(body.channel ?? "").trim();
       const code = String(body.code ?? "").trim();
@@ -439,7 +465,7 @@ async function handleRequest(
     }
 
     // API: devices pending
-    if (url === "/setup/api/devices/pending" && method === "GET") {
+    if (url === "/snapclaw/api/devices/pending" && method === "GET") {
       const r = await runCmd("openclaw", ["devices", "list", "--json"]);
       let requestIds: string[] = [];
       try {
@@ -452,7 +478,7 @@ async function handleRequest(
     }
 
     // API: devices approve
-    if (url === "/setup/api/devices/approve" && method === "POST") {
+    if (url === "/snapclaw/api/devices/approve" && method === "POST") {
       const body = await readJson(req);
       const id = String(body.requestId ?? "").trim();
       if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) {
@@ -463,7 +489,7 @@ async function handleRequest(
     }
 
     // API: reset
-    if (url === "/setup/api/reset" && method === "POST") {
+    if (url === "/snapclaw/api/reset" && method === "POST") {
       await gateway.stop();
       try {
         fs.unlinkSync(configPath());
@@ -472,7 +498,7 @@ async function handleRequest(
     }
 
     // Export backup
-    if (url === "/setup/export" && method === "GET") {
+    if (url === "/snapclaw/export" && method === "GET") {
       res.writeHead(200, {
         "Content-Type": "application/gzip",
         "Content-Disposition": 'attachment; filename="snapclaw-backup.tar.gz"',
@@ -482,7 +508,7 @@ async function handleRequest(
     }
 
     // Import backup
-    if (url === "/setup/import" && method === "POST") {
+    if (url === "/snapclaw/import" && method === "POST") {
       const body = await readBody(req);
       await tar.extract({ cwd: "/data", gzip: true }, []).end(body);
       if (isConfigured()) await gateway.restart();
@@ -497,7 +523,14 @@ async function handleRequest(
   // --- Everything else: proxy to gateway ---
 
   if (!isConfigured()) {
-    res.writeHead(302, { Location: "/setup" });
+    res.writeHead(302, { Location: "/snapclaw" });
+    res.end();
+    return;
+  }
+
+  // Redirect root to /snapclaw until channels are configured
+  if (url === "/" && !channelsReady) {
+    res.writeHead(302, { Location: "/snapclaw" });
     res.end();
     return;
   }
@@ -505,7 +538,7 @@ async function handleRequest(
   try {
     await gateway.ensure();
   } catch {
-    res.writeHead(302, { Location: "/setup" });
+    res.writeHead(302, { Location: "/snapclaw" });
     res.end();
     return;
   }
@@ -537,7 +570,7 @@ server.on("upgrade", (req, socket, head) => {
   const url = req.url ?? "";
 
   // Terminal WebSocket
-  if (url.startsWith("/setup/terminal")) {
+  if (url.startsWith("/snapclaw/terminal")) {
     const params = new URL(url, `http://localhost`).searchParams;
     const token = params.get("token");
     if (!token || !terminalTokens.has(token) || Date.now() > terminalTokens.get(token)!) {
@@ -601,7 +634,8 @@ server.listen(PORT, "0.0.0.0", async () => {
 
   // Start gateway if configured
   if (isConfigured()) {
-    console.log("[snapclaw] starting gateway...");
+    await checkChannelsReady();
+    console.log(`[snapclaw] starting gateway... (channels ready: ${channelsReady})`);
     try {
       await gateway.start();
       console.log("[snapclaw] gateway ready");

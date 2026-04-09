@@ -41,7 +41,7 @@ async function refreshStatus(): Promise<void> {
     const j = await httpJson<{
       configured: boolean;
       openclawVersion?: string;
-    }>("/setup/api/status");
+    }>("/snapclaw/api/status");
 
     isConfigured = !!j.configured;
     const ver = j.openclawVersion ? j.openclawVersion : "";
@@ -78,7 +78,7 @@ $("codexStartBtn").onclick = async () => {
       ok: boolean;
       oauthUrl: string | null;
       output: string;
-    }>("/setup/api/codex/start", {
+    }>("/snapclaw/api/codex/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{}",
@@ -127,7 +127,7 @@ $("codexCompleteBtn").onclick = async () => {
 
   try {
     const r = await httpJson<{ ok: boolean; output: string }>(
-      "/setup/api/codex/callback",
+      "/snapclaw/api/codex/callback",
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -167,7 +167,7 @@ $("telegramConnectBtn").onclick = async () => {
 
   try {
     const r = await httpJson<{ ok: boolean; output: string }>(
-      "/setup/api/telegram/add",
+      "/snapclaw/api/telegram/add",
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -196,7 +196,7 @@ $("telegramConnectBtn").onclick = async () => {
 
 async function checkTelegram(): Promise<void> {
   try {
-    const r = await httpJson<{ connected: boolean }>("/setup/api/telegram/verify");
+    const r = await httpJson<{ connected: boolean }>("/snapclaw/api/telegram/verify");
     if (r.connected) {
       setBadge($("telegramStatus"), "success", "Bot connected");
       ($("telegramToken") as HTMLInputElement).disabled = true;
@@ -245,9 +245,9 @@ function connectDashTerminal(): void {
   dashTerm.writeln("\x1b[1;32mConnecting...\x1b[0m\r\n");
 
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  httpJson<{ token: string }>("/setup/api/terminal-token")
+  httpJson<{ token: string }>("/snapclaw/api/terminal-token")
     .then((j) => {
-      const url = `${proto}//${location.host}/setup/terminal?token=${encodeURIComponent(j.token)}`;
+      const url = `${proto}//${location.host}/snapclaw/terminal?token=${encodeURIComponent(j.token)}`;
       dashWs = new WebSocket(url);
 
       dashWs.onopen = () => {
@@ -276,7 +276,7 @@ $("dashRestart").onclick = async () => {
   out.classList.remove("hidden");
   out.textContent = "Restarting gateway...";
   try {
-    const r = await httpJson<{ output: string }>("/setup/api/console/run", {
+    const r = await httpJson<{ output: string }>("/snapclaw/api/console/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ cmd: "gateway.restart", arg: "" }),
