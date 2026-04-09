@@ -269,7 +269,7 @@ async function handleRequest(
         "--skip-health",
         "--flow", "quickstart",
         "--mode", "local",
-        "--auth-choice", "codex-cli",
+        "--auth-choice", "openai-codex",
         "--gateway-port", String(INTERNAL_PORT),
         "--gateway-bind", "loopback",
         "--gateway-auth", "token",
