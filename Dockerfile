@@ -34,6 +34,10 @@ RUN apt-get update \
     tini gosu \
   && rm -rf /var/lib/apt/lists/*
 
+# Install Telegram channel plugin dependencies
+RUN cd /usr/local/lib/node_modules/openclaw \
+  && npm install grammy @grammyjs/runner @buape/carbon
+
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
