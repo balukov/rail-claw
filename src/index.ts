@@ -260,11 +260,10 @@ async function handleRequest(
       });
     }
 
-    // API: codex OAuth start
-    if (url === "/snapclaw/api/codex/start" && method === "POST") {
-      const r = await runCmd("openclaw", [
-        "onboard",
-        "--non-interactive",
+    // API: codex setup command (returns the command to run in terminal)
+    if (url === "/snapclaw/api/codex/command" && method === "GET") {
+      const cmd = [
+        "openclaw", "onboard",
         "--accept-risk",
         "--skip-health",
         "--flow", "quickstart",
@@ -275,33 +274,8 @@ async function handleRequest(
         "--gateway-auth", "token",
         "--gateway-token-ref-env", "OPENCLAW_GATEWAY_TOKEN",
         "--no-install-daemon",
-      ], 60_000);
-      const output = redactSecrets(r.output);
-      // Parse OAuth URL from output
-      const urlMatch = output.match(/https?:\/\/[^\s"'<>]+oauth[^\s"'<>]*/i)
-        ?? output.match(/https?:\/\/[^\s"'<>]+login[^\s"'<>]*/i)
-        ?? output.match(/https?:\/\/[^\s"'<>]+auth[^\s"'<>]*/i);
-      return sendJson(res, {
-        ok: r.code === 0,
-        oauthUrl: urlMatch ? urlMatch[0] : null,
-        output,
-      });
-    }
-
-    // API: codex OAuth callback
-    if (url === "/snapclaw/api/codex/callback" && method === "POST") {
-      const body = await readJson(req);
-      const redirectUrl = String(body.redirectUrl ?? "").trim();
-      if (!redirectUrl) {
-        return sendJson(res, { ok: false, error: "Missing redirectUrl" }, 400);
-      }
-      // Pass the redirect URL to openclaw to complete OAuth
-      const r = await runCmd("openclaw", ["auth", "callback", redirectUrl], 30_000);
-      if (r.code === 0) {
-        await applyPostSetupConfig();
-        await gateway.restart();
-      }
-      return sendJson(res, { ok: r.code === 0, output: redactSecrets(r.output) });
+      ].join(" ");
+      return sendJson(res, { ok: true, command: cmd });
     }
 
     // API: telegram add
