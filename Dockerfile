@@ -38,7 +38,8 @@ RUN apt-get update \
 
 # Pin openclaw version for reproducibility
 ARG OPENCLAW_VERSION=2026.4.8
-RUN npm install -g openclaw@${OPENCLAW_VERSION}
+RUN npm install -g openclaw@${OPENCLAW_VERSION} \
+  && npm install -g grammy
 
 # Install Playwright Chromium + system deps (using openclaw's bundled playwright-core)
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
