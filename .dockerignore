@@ -10,3 +10,4 @@ snapclaw-logo.png
 railway.toml
 .claude
 .env*
+docker-compose.yml
