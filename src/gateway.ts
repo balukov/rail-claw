@@ -117,6 +117,9 @@ export async function start(): Promise<void> {
   fs.mkdirSync(STATE_DIR, { recursive: true });
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
+  // Stop any leftover gateway process before starting
+  await runCmd("openclaw", ["gateway", "stop"]);
+
   // Auto-fix config issues (e.g. plugin schema changes across openclaw versions)
   try {
     const cfg = JSON.parse(fs.readFileSync(configPath(), "utf8"));
