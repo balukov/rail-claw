@@ -78,7 +78,8 @@
 
     /* Dashboard */
     .term-controls { display:flex; gap:.5rem; margin-bottom:.75rem; flex-wrap:wrap; }
-    #dashTerminalContainer { border-radius:12px; overflow:hidden; background:#0c0e14; border:1px solid var(--border); }
+    #setupTerminalContainer, #dashTerminalContainer { border-radius:12px; overflow:hidden; background:#0c0e14; border:1px solid var(--border); }
+    #setupTerminal { padding:6px; }
     #dashTerminal { padding:6px; }
 
     @keyframes fadeDown { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
@@ -103,52 +104,18 @@
   <!-- Setup cards (shown when not fully configured) -->
   <div id="setupCards">
 
-    <!-- Codex OAuth -->
-    <div class="card" id="codexCard">
-      <h2>Codex</h2>
-      <p class="muted">Connect via OpenAI Codex OAuth</p>
+    <!-- Setup terminal -->
+    <div class="card" id="setupCard">
+      <h2>Setup</h2>
+      <p class="muted">Complete the interactive setup below</p>
 
-      <div id="codexStart" style="margin-top:.75rem">
-        <button id="codexStartBtn">Start OAuth</button>
+      <div id="setupTermStart" style="margin-top:.75rem">
+        <button id="setupStartBtn">Start Setup</button>
       </div>
 
-      <div id="codexUrl" class="hidden">
-        <label>Copy this URL and open it in your browser</label>
-        <div class="url-row">
-          <input id="codexOauthUrl" readonly />
-          <button id="codexCopyBtn" class="btn-secondary">Copy</button>
-        </div>
-
-        <label>Paste the redirect URL you land on</label>
-        <div class="url-row">
-          <input id="codexRedirectUrl" placeholder="https://..." />
-          <button id="codexCompleteBtn">Done</button>
-        </div>
+      <div id="setupTermContainer" class="hidden" style="margin-top:.75rem">
+        <div id="setupTerminalContainer"><div id="setupTerminal"></div></div>
       </div>
-
-      <div id="codexStatus"></div>
-      <pre id="codexOutput" class="hidden"></pre>
-    </div>
-
-    <!-- Telegram -->
-    <div class="card" id="telegramCard">
-      <h2>Telegram</h2>
-      <p class="muted">Connect a Telegram bot</p>
-
-      <ol class="steps">
-        <li>Open <a href="https://t.me/BotFather" target="_blank">@BotFather</a> in Telegram</li>
-        <li>Send <code>/newbot</code> and follow the instructions</li>
-        <li>Copy the bot token and paste it below</li>
-      </ol>
-
-      <label>Bot token</label>
-      <div class="url-row">
-        <input id="telegramToken" placeholder="123456789:ABCdefGHI..." />
-        <button id="telegramConnectBtn">Connect</button>
-      </div>
-
-      <div id="telegramStatus"></div>
-      <pre id="telegramOutput" class="hidden"></pre>
     </div>
 
     <!-- Open Web UI link -->

@@ -145,18 +145,11 @@ async function autoOnboard(): Promise<boolean> {
   return false;
 }
 
-// --- Codex interactive session ---
+// --- Setup terminal WebSocket ---
 
-interface CodexSession {
-  pty: ReturnType<typeof pty.spawn>;
-  oauthUrl: string | null;
-  status: "waiting" | "done" | "error";
-  output: string;
-}
+const setupTermWss = new WebSocketServer({ noServer: true });
 
-let codexSession: CodexSession | null = null;
-
-function startCodexSession(): CodexSession {
+setupTermWss.on("connection", (ws: WebSocket) => {
   const args = [
     "onboard",
     "--accept-risk",
@@ -173,7 +166,7 @@ function startCodexSession(): CodexSession {
 
   const shell = pty.spawn("openclaw", args, {
     name: "xterm-256color",
-    cols: 120,
+    cols: 100,
     rows: 30,
     cwd: "/tmp",
     env: {
@@ -184,60 +177,36 @@ function startCodexSession(): CodexSession {
     } as Record<string, string>,
   });
 
-  const session: CodexSession = {
-    pty: shell,
-    oauthUrl: null,
-    status: "waiting",
-    output: "",
-  };
-
   shell.onData((data: string) => {
-    session.output += data;
-    console.log("[codex-pty]", JSON.stringify(data));
+    try { ws.send(data); } catch {}
+  });
 
-    // Strip ANSI escape codes for matching
-    const clean = session.output.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
-
-    // Auto-answer common interactive prompts by pressing Enter (accept default)
-    // or answering yes/no questions
-    const lastChunk = clean.slice(-200);
-    if (lastChunk.match(/\?\s*$/)) {
-      // A question is being asked — send Enter to accept default
-      console.log("[codex-pty] auto-answering prompt with Enter");
-      shell.write("\n");
-    }
-    if (lastChunk.match(/\(y\/n\)\s*$/i) || lastChunk.match(/\[Y\/n\]\s*$/)) {
-      console.log("[codex-pty] auto-answering y/n with y");
-      shell.write("y\n");
-    }
-
-    // Look for OAuth URL in output
-    if (!session.oauthUrl) {
-      const match = clean.match(/https?:\/\/[^\s"'<>\x00-\x1f]+/g);
-      if (match) {
-        // Pick the most likely OAuth URL (last one, usually the login URL)
-        session.oauthUrl = match[match.length - 1];
-        console.log("[codex-pty] found OAuth URL:", session.oauthUrl);
+  ws.on("message", (msg: Buffer) => {
+    const str = msg.toString();
+    try {
+      const parsed = JSON.parse(str);
+      if (parsed.type === "resize" && parsed.cols && parsed.rows) {
+        shell.resize(parsed.cols, parsed.rows);
+        return;
       }
-    }
+    } catch {}
+    shell.write(str);
   });
 
-  shell.onExit(({ exitCode }) => {
-    session.status = exitCode === 0 ? "done" : "error";
+  ws.on("close", () => shell.kill());
+
+  shell.onExit(async ({ exitCode }) => {
+    if (exitCode === 0 && isConfigured()) {
+      console.log("[setup-terminal] onboard succeeded, applying post-setup config...");
+      await applyPostSetupConfig();
+      await gateway.restart();
+      try { ws.send("\r\n\x1b[1;32mSetup complete! Reloading...\x1b[0m\r\n"); } catch {}
+      try { ws.send(JSON.stringify({ type: "setup-complete" })); } catch {}
+    }
+    try { ws.close(); } catch {}
   });
 
-  codexSession = session;
-
-  // Auto-cleanup after 5 minutes
-  setTimeout(() => {
-    if (codexSession === session) {
-      try { shell.kill(); } catch {}
-      codexSession = null;
-    }
-  }, 300_000);
-
-  return session;
-}
+});
 
 // --- Proxy ---
 
@@ -354,102 +323,14 @@ async function handleRequest(
       });
     }
 
-    // API: codex OAuth start — spawns interactive onboard, captures OAuth URL
-    if (url === "/snapclaw/api/codex/start" && method === "POST") {
-      // Kill stale session
-      if (codexSession) {
-        try { codexSession.pty.kill(); } catch {}
-        codexSession = null;
+    // API: setup terminal token
+    if (url === "/snapclaw/api/setup-terminal-token" && method === "GET") {
+      const token = crypto.randomBytes(24).toString("hex");
+      terminalTokens.set(token, Date.now() + 60_000);
+      for (const [k, exp] of terminalTokens) {
+        if (Date.now() > exp) terminalTokens.delete(k);
       }
-
-      let session: CodexSession;
-      try {
-        session = startCodexSession();
-      } catch (err: any) {
-        console.error("[codex/start] failed to spawn PTY:", err);
-        return sendJson(res, {
-          ok: false,
-          error: `Failed to spawn codex session: ${err.message ?? err}`,
-        }, 500);
-      }
-
-      // Wait up to 45s for the OAuth URL to appear
-      const deadline = Date.now() + 45_000;
-      while (!session.oauthUrl && session.status === "waiting" && Date.now() < deadline) {
-        await sleep(500);
-      }
-
-      return sendJson(res, {
-        ok: true,
-        oauthUrl: session.oauthUrl,
-        status: session.status,
-        output: redactSecrets(session.output),
-      });
-    }
-
-    // API: codex OAuth callback — sends redirect URL to the running onboard process
-    if (url === "/snapclaw/api/codex/callback" && method === "POST") {
-      const body = await readJson(req);
-      const redirectUrl = String(body.redirectUrl ?? "").trim();
-      if (!redirectUrl) {
-        return sendJson(res, { ok: false, error: "Missing redirectUrl" }, 400);
-      }
-      if (!codexSession || !codexSession.pty) {
-        return sendJson(res, { ok: false, error: "No active Codex session" }, 400);
-      }
-
-      // Write the redirect URL into the PTY (as if user pasted it)
-      codexSession.pty.write(redirectUrl + "\n");
-
-      // Wait for process to finish
-      const deadline = Date.now() + 30_000;
-      while (codexSession.status === "waiting" && Date.now() < deadline) {
-        await sleep(500);
-      }
-
-      const ok = codexSession.status === "done";
-      if (ok) {
-        await applyPostSetupConfig();
-        await gateway.restart();
-      }
-
-      const output = redactSecrets(codexSession.output);
-      codexSession = null;
-      return sendJson(res, { ok, output });
-    }
-
-    // API: codex status
-    if (url === "/snapclaw/api/codex/status" && method === "GET") {
-      return sendJson(res, {
-        ok: true,
-        active: !!codexSession,
-        oauthUrl: codexSession?.oauthUrl ?? null,
-        status: codexSession?.status ?? "idle",
-      });
-    }
-
-    // API: telegram add
-    if (url === "/snapclaw/api/telegram/add" && method === "POST") {
-      const body = await readJson(req);
-      const token = String(body.token ?? "").trim();
-      if (!token || !/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
-        return sendJson(res, { ok: false, error: "Invalid bot token format" }, 400);
-      }
-      const r = await runCmd("openclaw", [
-        "channels", "add", "--channel", "telegram", "--token", token,
-      ]);
-      if (r.code === 0) {
-        channelsReady = true;
-        await gateway.restart();
-      }
-      return sendJson(res, { ok: r.code === 0, output: redactSecrets(r.output) });
-    }
-
-    // API: telegram verify
-    if (url === "/snapclaw/api/telegram/verify" && method === "GET") {
-      const r = await runCmd("openclaw", ["channels", "list"]);
-      const hasTelegram = r.output.toLowerCase().includes("telegram");
-      return sendJson(res, { ok: true, connected: hasTelegram, output: redactSecrets(r.output) });
+      return sendJson(res, { token });
     }
 
     // API: terminal token
@@ -705,6 +586,21 @@ server.on("upgrade", (req, socket, head) => {
     terminalTokens.delete(token);
     termWss.handleUpgrade(req, socket, head, (ws) => {
       termWss.emit("connection", ws, req);
+    });
+    return;
+  }
+
+  // Setup terminal WebSocket
+  if (url.startsWith("/snapclaw/setup-terminal")) {
+    const params = new URL(url, `http://localhost`).searchParams;
+    const token = params.get("token");
+    if (!token || !terminalTokens.has(token) || Date.now() > terminalTokens.get(token)!) {
+      socket.destroy();
+      return;
+    }
+    terminalTokens.delete(token);
+    setupTermWss.handleUpgrade(req, socket, head, (ws) => {
+      setupTermWss.emit("connection", ws, req);
     });
     return;
   }
