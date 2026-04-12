@@ -155,6 +155,7 @@ const setupCommands: Record<string, { cmd: string; args: string[]; onSuccess?: (
     args: [
       "onboard",
       "--accept-risk",
+      "--reset", "--reset-scope", "config",
       "--skip-health",
       "--skip-channels",
       "--skip-skills",
