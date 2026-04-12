@@ -1,4 +1,5 @@
 import http from "node:http";
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -145,6 +146,26 @@ async function autoOnboard(): Promise<boolean> {
   return false;
 }
 
+// --- Resolve openclaw install dir (for workspace templates) ---
+
+function getOpenclawDir(): string {
+  try {
+    const bin = fs.realpathSync(
+      execSync("which openclaw", { encoding: "utf8" }).trim(),
+    );
+    // bin is e.g. /usr/lib/node_modules/openclaw/dist/cli.js or similar
+    // Walk up until we find docs/reference/templates
+    let dir = path.dirname(bin);
+    for (let i = 0; i < 5; i++) {
+      if (fs.existsSync(path.join(dir, "docs", "reference", "templates"))) return dir;
+      dir = path.dirname(dir);
+    }
+  } catch {}
+  return "/tmp";
+}
+
+const openclawDir = getOpenclawDir();
+
 // --- Setup terminal WebSocket ---
 
 const setupTermWss = new WebSocketServer({ noServer: true });
@@ -206,7 +227,7 @@ setupTermWss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
     name: "xterm-256color",
     cols: 100,
     rows: 30,
-    cwd: "/tmp",
+    cwd: openclawDir,
     env: {
       ...process.env,
       OPENCLAW_STATE_DIR: STATE_DIR,
