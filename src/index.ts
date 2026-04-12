@@ -170,10 +170,37 @@ const openclawDir = getOpenclawDir();
 
 const setupTermWss = new WebSocketServer({ noServer: true });
 
-const setupCommands: Record<string, { cmd: string; args: string[]; beforeSpawn?: () => void; onSuccess?: () => Promise<void> }> = {
+const setupCommands: Record<string, {
+  cmd: string;
+  args: string[];
+  autoSkipPatterns?: RegExp[];
+  beforeSpawn?: () => void;
+  onSuccess?: () => Promise<void>;
+}> = {
   codex: {
     cmd: "openclaw",
-    args: ["configure", "--section", "model"],
+    args: [
+      "onboard",
+      "--accept-risk",
+      "--skip-health",
+      "--skip-channels",
+      "--skip-skills",
+      "--skip-ui",
+      "--skip-search",
+      "--no-install-daemon",
+      "--auth-choice", "openai-codex",
+      "--flow", "quickstart",
+      "--mode", "local",
+      "--gateway-port", String(INTERNAL_PORT),
+      "--gateway-bind", "loopback",
+      "--gateway-auth", "token",
+      "--gateway-token-ref-env", "OPENCLAW_GATEWAY_TOKEN",
+    ],
+    autoSkipPatterns: [/Enable hooks\?/],
+    beforeSpawn: () => {
+      const cfgPath = configPath();
+      try { fs.unlinkSync(cfgPath); } catch {}
+    },
     onSuccess: async () => {
       await applyPostSetupConfig();
       await gateway.restart();
@@ -215,8 +242,23 @@ setupTermWss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
     } as Record<string, string>,
   });
 
+  let ptyBuffer = "";
   shell.onData((data: string) => {
     try { ws.send(data); } catch {}
+    if (config.autoSkipPatterns?.length) {
+      ptyBuffer += data;
+      const clean = ptyBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
+      for (const pat of config.autoSkipPatterns) {
+        if (pat.test(clean)) {
+          console.log(`[setup-terminal] auto-skipping: ${pat}`);
+          shell.write("\n");
+          ptyBuffer = "";
+          return;
+        }
+      }
+      // Keep buffer from growing unbounded
+      if (ptyBuffer.length > 2000) ptyBuffer = ptyBuffer.slice(-1000);
+    }
   });
 
   ws.on("message", (msg: Buffer) => {
