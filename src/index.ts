@@ -149,13 +149,12 @@ async function autoOnboard(): Promise<boolean> {
 
 const setupTermWss = new WebSocketServer({ noServer: true });
 
-const setupCommands: Record<string, { cmd: string; args: string[]; onSuccess?: () => Promise<void> }> = {
+const setupCommands: Record<string, { cmd: string; args: string[]; beforeSpawn?: () => void; onSuccess?: () => Promise<void> }> = {
   codex: {
     cmd: "openclaw",
     args: [
       "onboard",
       "--accept-risk",
-      "--reset", "--reset-scope", "config",
       "--skip-health",
       "--skip-channels",
       "--skip-skills",
@@ -170,6 +169,11 @@ const setupCommands: Record<string, { cmd: string; args: string[]; onSuccess?: (
       "--gateway-auth", "token",
       "--gateway-token-ref-env", "OPENCLAW_GATEWAY_TOKEN",
     ],
+    beforeSpawn: () => {
+      // Remove existing config so onboard doesn't ask about it
+      const cfgPath = configPath();
+      try { fs.unlinkSync(cfgPath); } catch {}
+    },
     onSuccess: async () => {
       await applyPostSetupConfig();
       await gateway.restart();
@@ -195,6 +199,8 @@ setupTermWss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
     ws.close();
     return;
   }
+
+  if (config.beforeSpawn) config.beforeSpawn();
 
   const shell = pty.spawn(config.cmd, config.args, {
     name: "xterm-256color",
