@@ -78,10 +78,11 @@
 
     /* Dashboard */
     .term-controls { display:flex; gap:.5rem; margin-bottom:.75rem; flex-wrap:wrap; }
-    #setupTerminalContainer, #dashTerminalContainer { border-radius:12px; overflow:hidden; background:#0c0e14; border:1px solid var(--border); }
-    #setupTerminal { padding:6px; }
-    #dashTerminal { padding:6px; }
-
+    .step-header { display:flex; align-items:flex-start; gap:.75rem; }
+    .step-number { display:flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:.85rem; flex-shrink:0; margin-top:.1rem; }
+    .step-number.done { background:var(--success); }
+    #codexTerminalContainer, #telegramTerminalContainer, #dashTerminalContainer { border-radius:12px; overflow:hidden; background:#0c0e14; border:1px solid var(--border); }
+    #codexTerminal, #telegramTerminal, #dashTerminal { padding:6px; }
     @keyframes fadeDown { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
     @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
     @media(max-width:500px) { .container{padding:1.25rem 1rem 3rem} .header img{width:48px;height:48px} }
@@ -104,17 +105,39 @@
   <!-- Setup cards (shown when not fully configured) -->
   <div id="setupCards">
 
-    <!-- Setup terminal -->
-    <div class="card" id="setupCard">
-      <h2>Setup</h2>
-      <p class="muted">Complete the interactive setup below</p>
-
-      <div id="setupTermStart" style="margin-top:.75rem">
-        <button id="setupStartBtn">Start Setup</button>
+    <!-- Step 1: Codex -->
+    <div class="card" id="codexCard">
+      <div class="step-header">
+        <span class="step-number">1</span>
+        <div>
+          <h2>Connect Codex</h2>
+          <p class="muted">Authenticate with OpenAI Codex via OAuth</p>
+        </div>
       </div>
+      <div id="codexStatus"></div>
+      <div id="codexActions" style="margin-top:.75rem">
+        <button id="codexStartBtn">Connect</button>
+      </div>
+      <div id="codexTermContainer" class="hidden" style="margin-top:.75rem">
+        <div id="codexTerminalContainer"><div id="codexTerminal"></div></div>
+      </div>
+    </div>
 
-      <div id="setupTermContainer" class="hidden" style="margin-top:.75rem">
-        <div id="setupTerminalContainer"><div id="setupTerminal"></div></div>
+    <!-- Step 2: Telegram -->
+    <div class="card" id="telegramCard">
+      <div class="step-header">
+        <span class="step-number">2</span>
+        <div>
+          <h2>Add Telegram Bot</h2>
+          <p class="muted">Connect a Telegram bot as a channel</p>
+        </div>
+      </div>
+      <div id="telegramStatus"></div>
+      <div id="telegramActions" style="margin-top:.75rem">
+        <button id="telegramStartBtn">Connect</button>
+      </div>
+      <div id="telegramTermContainer" class="hidden" style="margin-top:.75rem">
+        <div id="telegramTerminalContainer"><div id="telegramTerminal"></div></div>
       </div>
     </div>
 

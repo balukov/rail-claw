@@ -55,90 +55,105 @@ async function refreshStatus(): Promise<void> {
   }
 }
 
-// --- Setup Terminal ---
+function setBadge(el: HTMLElement, type: "success" | "pending", text: string): void {
+  el.innerHTML = "";
+  const badge = document.createElement("span");
+  badge.className = `status-badge ${type}`;
+  badge.textContent = text;
+  el.appendChild(badge);
+}
 
-let setupTerm: InstanceType<typeof Terminal> | null = null;
-let setupWs: WebSocket | null = null;
-let setupFit: ReturnType<typeof FitAddon.FitAddon.prototype.constructor> | null = null;
+// --- Setup step terminal ---
 
-function connectSetupTerminal(): void {
-  if (setupWs && setupWs.readyState <= WebSocket.OPEN) return;
+function connectStepTerminal(
+  step: string,
+  termContainerId: string,
+  termId: string,
+  actionsId: string,
+  statusId: string,
+  btnId: string,
+): void {
+  $(actionsId).classList.add("hidden");
+  $(termContainerId).classList.remove("hidden");
 
-  $("setupTermStart").classList.add("hidden");
-  $("setupTermContainer").classList.remove("hidden");
+  const term = new Terminal({
+    cursorBlink: true,
+    fontSize: 14,
+    fontFamily: "JetBrains Mono, monospace",
+    theme: {
+      background: "#0c0e14",
+      foreground: "#e8e6e3",
+      cursor: "#e85d3a",
+      selectionBackground: "rgba(232,93,58,0.25)",
+    },
+    convertEol: true,
+  });
+  const fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open($(termId));
+  fit.fit();
+  window.addEventListener("resize", () => fit.fit());
 
-  if (!setupTerm) {
-    setupTerm = new Terminal({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: "JetBrains Mono, monospace",
-      theme: {
-        background: "#0c0e14",
-        foreground: "#e8e6e3",
-        cursor: "#e85d3a",
-        selectionBackground: "rgba(232,93,58,0.25)",
-      },
-      convertEol: true,
-    });
-    setupFit = new FitAddon.FitAddon();
-    setupTerm.loadAddon(setupFit);
-    setupTerm.open($("setupTerminal"));
-    setupFit.fit();
-    window.addEventListener("resize", () => setupFit?.fit());
-  }
-
-  setupTerm.clear();
-  setupTerm.writeln("\x1b[1;32mConnecting...\x1b[0m\r\n");
+  term.writeln("\x1b[1;32mConnecting...\x1b[0m\r\n");
 
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   httpJson<{ token: string }>("/snapclaw/api/setup-terminal-token")
     .then((j) => {
-      const url = `${proto}//${location.host}/snapclaw/setup-terminal?token=${encodeURIComponent(j.token)}`;
-      setupWs = new WebSocket(url);
+      const url = `${proto}//${location.host}/snapclaw/setup-terminal?token=${encodeURIComponent(j.token)}&step=${step}`;
+      const ws = new WebSocket(url);
 
-      setupWs.onopen = () => {
-        setupTerm!.clear();
-        const dims = setupFit!.proposeDimensions();
-        if (dims)
-          setupWs!.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
+      ws.onopen = () => {
+        term.clear();
+        const dims = fit.proposeDimensions();
+        if (dims) ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
       };
-      setupWs.onmessage = (e: MessageEvent) => {
+      ws.onmessage = (e: MessageEvent) => {
         const data = e.data as string;
-        // Check for setup-complete signal
         try {
           const msg = JSON.parse(data);
-          if (msg.type === "setup-complete") {
-            setTimeout(() => location.reload(), 1500);
+          if (msg.type === "step-complete") {
+            if (msg.ok) {
+              setBadge($(statusId), "success", "Connected");
+              const stepNum = $(btnId).closest(".card")?.querySelector(".step-number");
+              if (stepNum) stepNum.classList.add("done");
+            }
+            refreshStatus();
             return;
           }
         } catch {}
-        setupTerm!.write(data);
+        term.write(data);
       };
-      setupWs.onclose = () => {
-        setupTerm!.writeln("\r\n\x1b[1;33mSession ended.\x1b[0m");
-        // Re-show button so user can retry
-        $("setupTermStart").classList.remove("hidden");
-        ($("setupStartBtn") as HTMLButtonElement).textContent = "Restart Setup";
-        ($("setupStartBtn") as HTMLButtonElement).disabled = false;
-        setupWs = null;
-        refreshStatus();
+      ws.onclose = () => {
+        term.writeln("\r\n\x1b[1;33mSession ended.\x1b[0m");
+        $(actionsId).classList.remove("hidden");
+        const btn = $(btnId) as HTMLButtonElement;
+        btn.textContent = "Retry";
+        btn.disabled = false;
       };
-      setupWs.onerror = () => setupTerm!.writeln("\r\n\x1b[1;31mConnection error.\x1b[0m");
-      setupTerm!.onData((d: string) => {
-        if (setupWs && setupWs.readyState === WebSocket.OPEN) setupWs.send(d);
+      ws.onerror = () => term.writeln("\r\n\x1b[1;31mConnection error.\x1b[0m");
+      term.onData((d: string) => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(d);
       });
-      setupTerm!.onResize((s: { cols: number; rows: number }) => {
-        if (setupWs && setupWs.readyState === WebSocket.OPEN)
-          setupWs.send(JSON.stringify({ type: "resize", cols: s.cols, rows: s.rows }));
+      term.onResize((s: { cols: number; rows: number }) => {
+        if (ws.readyState === WebSocket.OPEN)
+          ws.send(JSON.stringify({ type: "resize", cols: s.cols, rows: s.rows }));
       });
     })
-    .catch((e: Error) => setupTerm!.writeln(`\x1b[1;31mFailed: ${e}\x1b[0m`));
+    .catch((e: Error) => term.writeln(`\x1b[1;31mFailed: ${e}\x1b[0m`));
 }
 
-$("setupStartBtn").onclick = () => {
-  ($("setupStartBtn") as HTMLButtonElement).disabled = true;
-  ($("setupStartBtn") as HTMLButtonElement).textContent = "Connecting...";
-  connectSetupTerminal();
+// --- Step buttons ---
+
+$("codexStartBtn").onclick = () => {
+  ($("codexStartBtn") as HTMLButtonElement).disabled = true;
+  ($("codexStartBtn") as HTMLButtonElement).textContent = "Connecting...";
+  connectStepTerminal("codex", "codexTermContainer", "codexTerminal", "codexActions", "codexStatus", "codexStartBtn");
+};
+
+$("telegramStartBtn").onclick = () => {
+  ($("telegramStartBtn") as HTMLButtonElement).disabled = true;
+  ($("telegramStartBtn") as HTMLButtonElement).textContent = "Connecting...";
+  connectStepTerminal("telegram", "telegramTermContainer", "telegramTerminal", "telegramActions", "telegramStatus", "telegramStartBtn");
 };
 
 // --- Dashboard (shown when already configured) ---

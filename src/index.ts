@@ -149,22 +149,49 @@ async function autoOnboard(): Promise<boolean> {
 
 const setupTermWss = new WebSocketServer({ noServer: true });
 
-setupTermWss.on("connection", (ws: WebSocket) => {
-  const args = [
-    "onboard",
-    "--accept-risk",
-    "--skip-health",
-    "--flow", "quickstart",
-    "--mode", "local",
-    "--auth-choice", "openai-codex",
-    "--gateway-port", String(INTERNAL_PORT),
-    "--gateway-bind", "loopback",
-    "--gateway-auth", "token",
-    "--gateway-token-ref-env", "OPENCLAW_GATEWAY_TOKEN",
-    "--no-install-daemon",
-  ];
+const setupCommands: Record<string, { cmd: string; args: string[]; onSuccess?: () => Promise<void> }> = {
+  codex: {
+    cmd: "openclaw",
+    args: [
+      "onboard",
+      "--accept-risk",
+      "--skip-health",
+      "--flow", "quickstart",
+      "--mode", "local",
+      "--auth-choice", "openai-codex",
+      "--gateway-port", String(INTERNAL_PORT),
+      "--gateway-bind", "loopback",
+      "--gateway-auth", "token",
+      "--gateway-token-ref-env", "OPENCLAW_GATEWAY_TOKEN",
+      "--no-install-daemon",
+    ],
+    onSuccess: async () => {
+      await applyPostSetupConfig();
+      await gateway.restart();
+    },
+  },
+  telegram: {
+    cmd: "openclaw",
+    args: ["channels", "add", "--channel", "telegram"],
+    onSuccess: async () => {
+      channelsReady = true;
+      await gateway.restart();
+    },
+  },
+};
 
-  const shell = pty.spawn("openclaw", args, {
+setupTermWss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
+  const params = new URL(req.url ?? "", "http://localhost").searchParams;
+  const step = params.get("step") ?? "codex";
+  const config = setupCommands[step];
+
+  if (!config) {
+    ws.send("\x1b[1;31mUnknown setup step.\x1b[0m\r\n");
+    ws.close();
+    return;
+  }
+
+  const shell = pty.spawn(config.cmd, config.args, {
     name: "xterm-256color",
     cols: 100,
     rows: 30,
@@ -196,16 +223,14 @@ setupTermWss.on("connection", (ws: WebSocket) => {
   ws.on("close", () => shell.kill());
 
   shell.onExit(async ({ exitCode }) => {
-    if (exitCode === 0 && isConfigured()) {
-      console.log("[setup-terminal] onboard succeeded, applying post-setup config...");
-      await applyPostSetupConfig();
-      await gateway.restart();
-      try { ws.send("\r\n\x1b[1;32mSetup complete! Reloading...\x1b[0m\r\n"); } catch {}
-      try { ws.send(JSON.stringify({ type: "setup-complete" })); } catch {}
+    if (exitCode === 0 && config.onSuccess) {
+      console.log(`[setup-terminal] step "${step}" succeeded`);
+      await config.onSuccess();
+      try { ws.send("\r\n\x1b[1;32mDone!\x1b[0m\r\n"); } catch {}
     }
+    try { ws.send(JSON.stringify({ type: "step-complete", step, ok: exitCode === 0 })); } catch {}
     try { ws.close(); } catch {}
   });
-
 });
 
 // --- Proxy ---
