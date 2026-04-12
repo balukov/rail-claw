@@ -234,12 +234,15 @@ setupTermWss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
   ws.on("close", () => shell.kill());
 
   shell.onExit(async ({ exitCode }) => {
-    if (exitCode === 0 && config.onSuccess) {
-      console.log(`[setup-terminal] step "${step}" succeeded`);
+    // Treat as success if config exists (onboard may fail on non-critical
+    // template steps even after auth succeeds)
+    const ok = exitCode === 0 || isConfigured();
+    if (ok && config.onSuccess) {
+      console.log(`[setup-terminal] step "${step}" succeeded (exit=${exitCode})`);
       await config.onSuccess();
       try { ws.send("\r\n\x1b[1;32mDone!\x1b[0m\r\n"); } catch {}
     }
-    try { ws.send(JSON.stringify({ type: "step-complete", step, ok: exitCode === 0 })); } catch {}
+    try { ws.send(JSON.stringify({ type: "step-complete", step, ok })); } catch {}
     try { ws.close(); } catch {}
   });
 });
