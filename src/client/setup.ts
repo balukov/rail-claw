@@ -72,7 +72,9 @@ async function refreshStatus(): Promise<StatusResponse | null> {
     const j = await httpJson<StatusResponse>("/snapclaw/api/status");
     lastStatus = j;
     const ver = j.openclawVersion ?? "";
-    $("status").textContent = j.configured ? `Ready ${ver}` : "Setting up...";
+    $("status").textContent = j.configured
+      ? (j.channelsReady ? `Ready ${ver}` : `Configured ${ver}`)
+      : `Setting up... ${ver}`;
     $("statusBar").classList.toggle("configured", !!j.configured);
     return j;
   } catch (e) {
