@@ -28,7 +28,7 @@ One-click deploy. No Docker, no terminal, no DevOps. Just click the button, foll
 
 ## Setup
 
-In Railway, open **Settings > Networking** and click your public domain. Add `/snapclaw` to the URL and log in with your `SETUP_PASSWORD`.
+In Railway, open **Settings > Networking** and click your public domain. Log in with your `SETUP_PASSWORD`.
 
 **Step 1 — Connect Codex**
 - Click **Connect** — copy the OAuth URL, sign in with your ChatGPT account, paste the redirect URL back
