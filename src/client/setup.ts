@@ -98,7 +98,7 @@ function restoreUI(s: StatusResponse): void {
   // Telegram state
   if (s.channelsReady) {
     // Fully connected and paired
-    $("telegramTokenSection").classList.add("hidden");
+    $("telegramSetup").classList.add("hidden");
     $("telegramPairing").classList.add("hidden");
     setBadge($("telegramStatus"), "success", "Telegram");
     $("telegramStep").classList.add("done");
