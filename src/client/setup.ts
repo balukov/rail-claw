@@ -59,6 +59,7 @@ function setLoading(btn: HTMLButtonElement, loading: boolean, text: string): voi
 
 interface StatusResponse {
   configured: boolean;
+  codexConnected: boolean;
   channelsReady: boolean;
   botTokenSet: boolean;
   model?: string | null;
@@ -86,7 +87,7 @@ async function refreshStatus(): Promise<StatusResponse | null> {
 
 function restoreUI(s: StatusResponse): void {
   // Codex state
-  if (s.configured) {
+  if (s.codexConnected) {
     $("codexStart").classList.add("hidden");
     $("codexOauth").classList.add("hidden");
     const modelLabel = s.model ?? "Connected";

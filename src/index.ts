@@ -435,13 +435,18 @@ async function handleRequest(
       const channels = cfg?.channels as Record<string, unknown> | undefined;
       const tg = channels?.telegram as Record<string, unknown> | undefined;
       const botTokenSet = !!(tg?.botToken);
-      // Extract model name from agents.defaults.model or top-level
+      // Extract model name from agents.defaults.model
       const agents = cfg?.agents as Record<string, unknown> | undefined;
       const defaults = agents?.defaults as Record<string, unknown> | undefined;
       const model = (defaults?.model as string) ?? null;
+      // Check if auth credentials exist (not just config file)
+      const auth = cfg?.auth as Record<string, unknown> | undefined;
+      const profiles = auth?.profiles as Record<string, unknown> | undefined;
+      const hasAuth = !!(profiles && Object.keys(profiles).length > 0);
       return sendJson(res, {
         ok: true,
         configured: isConfigured(),
+        codexConnected: hasAuth,
         channelsReady,
         botTokenSet,
         model,
