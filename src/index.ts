@@ -365,10 +365,15 @@ async function handleRequest(
     // API: status
     if (url === "/snapclaw/api/status" && method === "GET") {
       const r = await runCmd("openclaw", ["--version"]);
+      const cfg = readConfig();
+      const channels = cfg?.channels as Record<string, unknown> | undefined;
+      const tg = channels?.telegram as Record<string, unknown> | undefined;
+      const botTokenSet = !!(tg?.botToken);
       return sendJson(res, {
         ok: true,
         configured: isConfigured(),
         channelsReady,
+        botTokenSet,
         openclawVersion: r.output.trim(),
         gatewayTarget: GATEWAY_TARGET,
       });

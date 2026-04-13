@@ -83,6 +83,8 @@
     .step-number.done { background:var(--success); }
     #dashTerminalContainer { border-radius:12px; overflow:hidden; background:#0c0e14; border:1px solid var(--border); }
     #dashTerminal { padding:6px; }
+    .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; vertical-align:middle; margin-right:6px; }
+    @keyframes spin { to { transform:rotate(360deg) } }
     @keyframes fadeDown { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
     @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
     @media(max-width:500px) { .container{padding:1.25rem 1rem 3rem} .header img{width:48px;height:48px} }
@@ -154,10 +156,21 @@
         <li>Copy the bot token and paste it below</li>
       </ol>
 
-      <label>Bot token</label>
-      <div class="url-row">
-        <input id="telegramToken" placeholder="123456789:ABCdefGHI..." />
-        <button id="telegramConnectBtn">Connect</button>
+      <div id="telegramTokenSection">
+        <label>Bot token</label>
+        <div class="url-row">
+          <input id="telegramToken" placeholder="123456789:ABCdefGHI..." />
+          <button id="telegramConnectBtn">Connect</button>
+        </div>
+      </div>
+
+      <div id="telegramPairing" class="hidden">
+        <p class="muted" style="margin-top:.75rem">The bot sent you a pairing code in Telegram. Enter it below.</p>
+        <label>Pairing code</label>
+        <div class="url-row">
+          <input id="telegramPairingCode" placeholder="ABCD1234" style="text-transform:uppercase" />
+          <button id="telegramApproveBtn">Approve</button>
+        </div>
       </div>
 
       <pre id="telegramOutput" class="hidden"></pre>
