@@ -210,21 +210,26 @@ function startCodexSession(): CodexSession {
 
   shell.onData((data: string) => {
     session.output += data;
-    const clean = session.output.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+    const clean = data.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
       .replace(/\x1b\][^\x07]*\x07/g, "");
-
-    // Auto-skip hooks prompt
-    if (/Enable hooks\?/.test(clean.slice(-500))) {
-      shell.write("\r");
-    }
 
     // Capture OAuth URL
     if (!session.oauthUrl) {
-      const urls = clean.match(/https?:\/\/[^\s"'<>\x00-\x1f]+/g);
+      const allClean = session.output.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+        .replace(/\x1b\][^\x07]*\x07/g, "");
+      const urls = allClean.match(/https?:\/\/[^\s"'<>\x00-\x1f]+/g);
       if (urls) {
         session.oauthUrl = urls[urls.length - 1];
         console.log("[codex] found OAuth URL:", session.oauthUrl);
       }
+    }
+
+    // Once config is written, auth succeeded — kill the PTY
+    // (onboard may hang on hooks prompt after this)
+    if (clean.includes("Updated") && clean.includes("openclaw.json")) {
+      console.log("[codex] config written, finishing session");
+      session.status = "done";
+      setTimeout(() => { try { shell.kill(); } catch {} }, 500);
     }
   });
 
