@@ -364,6 +364,7 @@ async function handleRequest(
 
     // API: status
     if (url === "/snapclaw/api/status" && method === "GET") {
+      if (!channelsReady) await checkChannelsReady();
       const r = await runCmd("openclaw", ["--version"]);
       const cfg = readConfig();
       const channels = cfg?.channels as Record<string, unknown> | undefined;
@@ -579,6 +580,9 @@ async function handleRequest(
         return sendJson(res, { ok: false, error: "Missing channel or code" }, 400);
       }
       const r = await runCmd("openclaw", ["pairing", "approve", channel, code]);
+      if (r.code === 0) {
+        channelsReady = true;
+      }
       return sendJson(res, { ok: r.code === 0, output: redactSecrets(r.output) });
     }
 
