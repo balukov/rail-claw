@@ -423,7 +423,7 @@ async function handleRequest(
         return sendJson(res, { ok: false, error: "Invalid bot token format" }, 400);
       }
       const r = await runCmd("openclaw", [
-        "channels", "add", "--channel", "telegram", "--token", token,
+        "config", "set", "channels.telegram.botToken", token,
       ]);
       if (r.code === 0) {
         channelsReady = true;
