@@ -50,6 +50,10 @@ COPY --from=builder /app/package.json ./package.json
 
 RUN chown -R node:node /snapclaw
 
+# Git config for the agent
+RUN git config --system user.name "OpenClaw Agent" \
+  && git config --system user.email "agent@openclaw.local"
+
 # Prepare data directories (Railway mounts volume at /data)
 RUN mkdir -p /data/.openclaw /data/workspace \
   && chown -R node:node /data
