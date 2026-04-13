@@ -78,6 +78,7 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
 // --- Channel readiness ---
 
 let channelsReady = false;
+let cachedVersion = "";
 
 async function checkChannelsReady(): Promise<boolean> {
   try {
@@ -364,8 +365,14 @@ async function handleRequest(
 
     // API: status
     if (url === "/snapclaw/api/status" && method === "GET") {
-      if (!channelsReady) await checkChannelsReady();
-      const r = await runCmd("openclaw", ["--version"]);
+      if (!channelsReady) {
+        // Check config first (fast), only fall back to CLI if needed
+        const cfgCheck = readConfig();
+        const pluginEntries = (cfgCheck?.plugins as Record<string, unknown>)?.entries as Record<string, unknown> | undefined;
+        if (pluginEntries && Object.keys(pluginEntries).some(k => ["telegram", "discord", "whatsapp"].includes(k))) {
+          channelsReady = true;
+        }
+      }
       const cfg = readConfig();
       const channels = cfg?.channels as Record<string, unknown> | undefined;
       const tg = channels?.telegram as Record<string, unknown> | undefined;
@@ -380,7 +387,7 @@ async function handleRequest(
         channelsReady,
         botTokenSet,
         model,
-        openclawVersion: r.output.trim(),
+        openclawVersion: cachedVersion,
         gatewayTarget: GATEWAY_TARGET,
       });
     }
@@ -727,6 +734,12 @@ server.listen(PORT, "0.0.0.0", async () => {
   console.log(`[snapclaw] listening on :${PORT}`);
   console.log(`[snapclaw] state: ${STATE_DIR}`);
   console.log(`[snapclaw] gateway target: ${GATEWAY_TARGET}`);
+
+  // Cache version string
+  try {
+    const v = await runCmd("openclaw", ["--version"], 10_000);
+    cachedVersion = v.output.trim();
+  } catch {}
 
   // Ensure directories exist
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
