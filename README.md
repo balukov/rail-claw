@@ -10,6 +10,14 @@
   </a>
 </p>
 
+One-click deploy. No Docker, no terminal, no DevOps. Just click the button, follow the setup wizard, and talk to your bot.
+
+## What you need
+
+- [Railway](https://railway.app) account (free tier works)
+- [ChatGPT](https://chat.openai.com) subscription (for Codex OAuth)
+- [Telegram](https://telegram.org) app
+
 ## Deploy
 
 1. Click **Deploy on Railway**
