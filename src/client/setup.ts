@@ -63,97 +63,143 @@ function setBadge(el: HTMLElement, type: "success" | "pending", text: string): v
   el.appendChild(badge);
 }
 
-// --- Setup step terminal ---
-
-function connectStepTerminal(
-  step: string,
-  termContainerId: string,
-  termId: string,
-  actionsId: string,
-  statusId: string,
-  btnId: string,
-): void {
-  $(actionsId).classList.add("hidden");
-  $(termContainerId).classList.remove("hidden");
-
-  const term = new Terminal({
-    cursorBlink: true,
-    fontSize: 14,
-    fontFamily: "JetBrains Mono, monospace",
-    theme: {
-      background: "#0c0e14",
-      foreground: "#e8e6e3",
-      cursor: "#e85d3a",
-      selectionBackground: "rgba(232,93,58,0.25)",
-    },
-    convertEol: true,
-  });
-  const fit = new FitAddon.FitAddon();
-  term.loadAddon(fit);
-  term.open($(termId));
-  fit.fit();
-  window.addEventListener("resize", () => fit.fit());
-
-  term.writeln("\x1b[1;32mConnecting...\x1b[0m\r\n");
-
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  httpJson<{ token: string }>("/snapclaw/api/setup-terminal-token")
-    .then((j) => {
-      const url = `${proto}//${location.host}/snapclaw/setup-terminal?token=${encodeURIComponent(j.token)}&step=${step}`;
-      const ws = new WebSocket(url);
-
-      ws.onopen = () => {
-        term.clear();
-        const dims = fit.proposeDimensions();
-        if (dims) ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
-      };
-      ws.onmessage = (e: MessageEvent) => {
-        const data = e.data as string;
-        try {
-          const msg = JSON.parse(data);
-          if (msg.type === "step-complete") {
-            if (msg.ok) {
-              setBadge($(statusId), "success", "Connected");
-              const stepNum = $(btnId).closest(".card")?.querySelector(".step-number");
-              if (stepNum) stepNum.classList.add("done");
-            }
-            refreshStatus();
-            return;
-          }
-        } catch {}
-        term.write(data);
-      };
-      ws.onclose = () => {
-        term.writeln("\r\n\x1b[1;33mSession ended.\x1b[0m");
-        $(actionsId).classList.remove("hidden");
-        const btn = $(btnId) as HTMLButtonElement;
-        btn.textContent = "Retry";
-        btn.disabled = false;
-      };
-      ws.onerror = () => term.writeln("\r\n\x1b[1;31mConnection error.\x1b[0m");
-      term.onData((d: string) => {
-        if (ws.readyState === WebSocket.OPEN) ws.send(d);
-      });
-      term.onResize((s: { cols: number; rows: number }) => {
-        if (ws.readyState === WebSocket.OPEN)
-          ws.send(JSON.stringify({ type: "resize", cols: s.cols, rows: s.rows }));
-      });
-    })
-    .catch((e: Error) => term.writeln(`\x1b[1;31mFailed: ${e}\x1b[0m`));
+function showOutput(el: HTMLElement, text: string): void {
+  el.classList.remove("hidden");
+  el.textContent = text;
 }
 
-// --- Step buttons ---
+// --- Codex OAuth ---
 
-$("codexStartBtn").onclick = () => {
-  ($("codexStartBtn") as HTMLButtonElement).disabled = true;
-  ($("codexStartBtn") as HTMLButtonElement).textContent = "Connecting...";
-  connectStepTerminal("codex", "codexTermContainer", "codexTerminal", "codexActions", "codexStatus", "codexStartBtn");
+$("codexStartBtn").onclick = async () => {
+  const btn = $("codexStartBtn") as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = "Starting...";
+  $("codexOutput").classList.add("hidden");
+
+  try {
+    const r = await httpJson<{
+      ok: boolean;
+      oauthUrl: string | null;
+      status: string;
+      error?: string;
+    }>("/snapclaw/api/codex/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+
+    if (r.oauthUrl) {
+      ($("codexOauthUrl") as HTMLInputElement).value = r.oauthUrl;
+      $("codexOauth").classList.remove("hidden");
+      $("codexStart").classList.add("hidden");
+      setBadge($("codexStatus"), "pending", "Waiting for sign-in...");
+    } else if (r.status === "done") {
+      setBadge($("codexStatus"), "success", "Connected");
+      $("codexStart").classList.add("hidden");
+      $("codexStep").classList.add("done");
+      await refreshStatus();
+    } else {
+      showOutput($("codexOutput"), r.error ?? "No OAuth URL found. Try again.");
+      btn.disabled = false;
+      btn.textContent = "Connect";
+    }
+  } catch (e) {
+    showOutput($("codexOutput"), `Error: ${e}`);
+    btn.disabled = false;
+    btn.textContent = "Connect";
+  }
 };
 
-$("telegramStartBtn").onclick = () => {
-  ($("telegramStartBtn") as HTMLButtonElement).disabled = true;
-  ($("telegramStartBtn") as HTMLButtonElement).textContent = "Connecting...";
-  connectStepTerminal("telegram", "telegramTermContainer", "telegramTerminal", "telegramActions", "telegramStatus", "telegramStartBtn");
+$("codexCopyBtn").onclick = () => {
+  const input = $("codexOauthUrl") as HTMLInputElement;
+  navigator.clipboard.writeText(input.value).then(() => {
+    $("codexCopyBtn").textContent = "Copied!";
+    setTimeout(() => { $("codexCopyBtn").textContent = "Copy"; }, 2000);
+  });
+};
+
+$("codexCompleteBtn").onclick = async () => {
+  const redirectUrl = ($("codexRedirectUrl") as HTMLInputElement).value.trim();
+  if (!redirectUrl) {
+    alert("Paste the redirect URL first.");
+    return;
+  }
+
+  const btn = $("codexCompleteBtn") as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = "Verifying...";
+
+  try {
+    const r = await httpJson<{ ok: boolean; status: string }>(
+      "/snapclaw/api/codex/callback",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ redirectUrl }),
+      },
+    );
+
+    if (r.ok) {
+      setBadge($("codexStatus"), "success", "Connected");
+      $("codexOauth").classList.add("hidden");
+      $("codexStep").classList.add("done");
+      await refreshStatus();
+    } else {
+      showOutput($("codexOutput"), "Authentication failed. Try again.");
+      $("codexOauth").classList.add("hidden");
+      $("codexStart").classList.remove("hidden");
+      ($("codexStartBtn") as HTMLButtonElement).disabled = false;
+      ($("codexStartBtn") as HTMLButtonElement).textContent = "Connect";
+      btn.disabled = false;
+      btn.textContent = "Done";
+    }
+  } catch (e) {
+    showOutput($("codexOutput"), `Error: ${e}`);
+    btn.disabled = false;
+    btn.textContent = "Done";
+  }
+};
+
+// --- Telegram ---
+
+$("telegramConnectBtn").onclick = async () => {
+  const token = ($("telegramToken") as HTMLInputElement).value.trim();
+  if (!token) {
+    alert("Paste your bot token first.");
+    return;
+  }
+
+  const btn = $("telegramConnectBtn") as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = "Connecting...";
+  $("telegramOutput").classList.add("hidden");
+
+  try {
+    const r = await httpJson<{ ok: boolean; output: string }>(
+      "/snapclaw/api/telegram/add",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token }),
+      },
+    );
+
+    if (r.ok) {
+      setBadge($("telegramStatus"), "success", "Bot connected");
+      ($("telegramToken") as HTMLInputElement).disabled = true;
+      btn.classList.add("hidden");
+      $("telegramStep").classList.add("done");
+      await refreshStatus();
+    } else {
+      showOutput($("telegramOutput"), r.output);
+      btn.disabled = false;
+      btn.textContent = "Connect";
+    }
+  } catch (e) {
+    showOutput($("telegramOutput"), `Error: ${e}`);
+    btn.disabled = false;
+    btn.textContent = "Connect";
+  }
 };
 
 // --- Dashboard (shown when already configured) ---
