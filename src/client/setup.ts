@@ -61,6 +61,7 @@ interface StatusResponse {
   configured: boolean;
   channelsReady: boolean;
   botTokenSet: boolean;
+  model?: string | null;
   openclawVersion?: string;
 }
 
@@ -88,7 +89,8 @@ function restoreUI(s: StatusResponse): void {
   if (s.configured) {
     $("codexStart").classList.add("hidden");
     $("codexOauth").classList.add("hidden");
-    setBadge($("codexStatus"), "success", "Connected");
+    const modelLabel = s.model ?? "Connected";
+    setBadge($("codexStatus"), "success", modelLabel);
     $("codexStep").classList.add("done");
   }
 
@@ -97,7 +99,7 @@ function restoreUI(s: StatusResponse): void {
     // Fully connected and paired
     $("telegramTokenSection").classList.add("hidden");
     $("telegramPairing").classList.add("hidden");
-    setBadge($("telegramStatus"), "success", "Connected");
+    setBadge($("telegramStatus"), "success", "Telegram");
     $("telegramStep").classList.add("done");
   } else if (s.botTokenSet) {
     // Token set but not yet paired
@@ -275,7 +277,6 @@ let dashWs: WebSocket | null = null;
 let dashFit: ReturnType<typeof FitAddon.FitAddon.prototype.constructor> | null = null;
 
 function showDashboard(): void {
-  $("setupCards").classList.add("hidden");
   $("dashboard").classList.remove("hidden");
 }
 
@@ -355,9 +356,8 @@ $("dashRestart").onclick = async () => {
 
 refreshStatus().then((s) => {
   if (!s) return;
+  restoreUI(s);
   if (s.channelsReady) {
     showDashboard();
-  } else {
-    restoreUI(s);
   }
 });

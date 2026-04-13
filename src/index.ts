@@ -370,11 +370,16 @@ async function handleRequest(
       const channels = cfg?.channels as Record<string, unknown> | undefined;
       const tg = channels?.telegram as Record<string, unknown> | undefined;
       const botTokenSet = !!(tg?.botToken);
+      // Extract model name from agents.defaults.model or top-level
+      const agents = cfg?.agents as Record<string, unknown> | undefined;
+      const defaults = agents?.defaults as Record<string, unknown> | undefined;
+      const model = (defaults?.model as string) ?? null;
       return sendJson(res, {
         ok: true,
         configured: isConfigured(),
         channelsReady,
         botTokenSet,
+        model,
         openclawVersion: r.output.trim(),
         gatewayTarget: GATEWAY_TARGET,
       });
