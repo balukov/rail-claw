@@ -2,7 +2,14 @@
   <img src="snapclaw-logo.png" alt="SnapClaw" width="300"/>
 </p>
 
+<h1 align="center">SnapClaw</h1>
+
 <p align="center"><em>Your own AI agent on Railway in 5 minutes</em></p>
+
+<p align="center">
+  One-click OpenClaw deploy for Railway + Telegram.<br/>
+  No Docker, no terminal, no DevOps. Just deploy, connect, and chat.
+</p>
 
 <p align="center">
   <a href="https://railway.com/deploy/snapclaw" target="_blank">
@@ -10,12 +17,37 @@
   </a>
 </p>
 
-One-click deploy. No Docker, no terminal, no DevOps. Just click the button, follow the setup wizard, and talk to your bot.
+<p align="center">
+  ⭐ If SnapClaw helped you, please star the repo — it genuinely helps more people discover it.
+</p>
+
+> Already used in **19 Railway deployments**, with **16 currently active**.
+
+## Why SnapClaw
+
+[OpenClaw](https://openclaw.ai) is powerful, but not everyone wants to deal with Docker, terminals, or infrastructure setup.
+
+SnapClaw gives you the fastest path to a working personal AI agent:
+
+- Deploy on Railway in one click
+- Connect your ChatGPT account
+- Add a Telegram bot
+- Start chatting with your own assistant
+
+## Who it’s for
+
+SnapClaw is for people who want a personal AI agent without infra pain:
+
+- indie hackers
+- makers
+- technical founders
+- QA / dev / product people
+- anyone who wants an AI assistant in Telegram fast
 
 ## What you need
 
-- [Railway](https://railway.app) account (free tier works)
-- [ChatGPT](https://chat.openai.com) subscription (for Codex OAuth)
+- [Railway](https://railway.app) account
+- [ChatGPT](https://chat.openai.com) subscription for Codex OAuth
 - [Telegram](https://telegram.org) app
 
 ## Deploy
@@ -24,32 +56,68 @@ One-click deploy. No Docker, no terminal, no DevOps. Just click the button, foll
 2. Set two environment variables:
    - `SETUP_PASSWORD` — password for the admin panel
    - `OPENCLAW_GATEWAY_TOKEN` — any random string
-3. Deploy and wait for the build
+3. Wait for the deploy to finish
 
 ## Setup
 
-In Railway, open **Settings > Networking** and click your public domain. Log in with your `SETUP_PASSWORD`.
+In Railway, open **Settings > Networking** and open your public domain.  
+Log in with your `SETUP_PASSWORD`.
 
-**Step 1 — Connect Codex**
-- Click **Connect** — copy the OAuth URL, sign in with your ChatGPT account, paste the redirect URL back
+### Step 1: Connect Codex
 
-**Step 2 — Add Telegram Bot**
-- Create a bot via [@BotFather](https://t.me/BotFather) in Telegram (`/newbot`)
-- Paste the bot token and click **Connect**
+- Click **Connect**
+- Copy the OAuth URL
+- Sign in with your ChatGPT account
+- Paste the redirect URL back
+
+### Step 2: Add Telegram Bot
+
+- Create a bot with [@BotFather](https://t.me/BotFather) using `/newbot`
+- Paste the bot token into SnapClaw
 - Send a message to your bot to get a pairing code
 - Enter the code and click **Approve**
 
-Done. Talk to your bot via Telegram or the Web UI.
+Done. Your AI agent is live in Telegram and the Web UI.
 
-## Your data
+## What gets persisted
 
-Everything lives on a Railway Volume at `/data` and survives redeploys:
+Everything is stored on a Railway Volume at `/data` and survives redeploys:
 
-- Conversations, memory, config, credentials, skills, workspace
+- conversations
+- memory
+- config
+- credentials
+- skills
+- workspace
 
-To update, just redeploy.
+## Why people like it
+
+- no Docker setup
+- no local terminal work
+- no VPS maintenance
+- fast path from zero to working agent
+- persists data across redeploys
+
+## FAQ
+
+### Do I need Docker?
+No.
+
+### Do I need to use a terminal?
+No.
+
+### Do I need DevOps experience?
+No. Railway handles deployment.
+
+### Can I update later?
+Yes, just redeploy.
 
 ## Credits
 
-- [OpenClaw](https://openclaw.ai) | [GitHub](https://github.com/openclaw/openclaw)
+- [OpenClaw](https://openclaw.ai)
+- [OpenClaw GitHub](https://github.com/openclaw/openclaw)
 - SnapClaw by [@balukov](https://github.com/balukov)
+
+---
+
+If you deploy SnapClaw and it helps you, give the repo a star ⭐
