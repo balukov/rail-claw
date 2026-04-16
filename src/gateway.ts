@@ -67,8 +67,12 @@ async function ensureConfig(): Promise<void> {
   try {
     const chromiumDir = fs.readdirSync(browsersDir).find((d) => d.startsWith("chromium-"));
     if (chromiumDir) {
-      chromiumPath = `${browsersDir}/${chromiumDir}/chrome-linux/chrome`;
-      if (!fs.existsSync(chromiumPath)) chromiumPath = undefined;
+      // Playwright uses chrome-linux64 or chrome-linux depending on version
+      for (const sub of ["chrome-linux64", "chrome-linux"]) {
+        chromiumPath = `${browsersDir}/${chromiumDir}/${sub}/chrome`;
+        if (fs.existsSync(chromiumPath)) break;
+        chromiumPath = undefined;
+      }
     }
   } catch {}
 
