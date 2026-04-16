@@ -61,20 +61,33 @@ async function ensureConfig(): Promise<void> {
     JSON.stringify([...origins]),
   ]);
 
-  // Enable browser plugin — OpenClaw auto-detects system chromium
+  // Enable browser plugin with Playwright's bundled Chromium
+  const browsersDir = process.env.PLAYWRIGHT_BROWSERS_PATH || "/home/node/.cache/ms-playwright";
+  let chromiumPath: string | undefined;
+  try {
+    const chromiumDir = fs.readdirSync(browsersDir).find((d) => d.startsWith("chromium-"));
+    if (chromiumDir) {
+      chromiumPath = `${browsersDir}/${chromiumDir}/chrome-linux/chrome`;
+      if (!fs.existsSync(chromiumPath)) chromiumPath = undefined;
+    }
+  } catch {}
+
+  const browserConfig: Record<string, unknown> = {
+    enabled: true,
+    headless: true,
+    noSandbox: true,
+    defaultProfile: "openclaw",
+    snapshotDefaults: { mode: "efficient" },
+    extraArgs: [
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+    ],
+  };
+  if (chromiumPath) browserConfig.executablePath = chromiumPath;
+
   await runCmd("openclaw", [
     "config", "set", "--json", "browser",
-    JSON.stringify({
-      enabled: true,
-      headless: true,
-      noSandbox: true,
-      defaultProfile: "openclaw",
-      snapshotDefaults: { mode: "efficient" },
-      extraArgs: [
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-      ],
-    }),
+    JSON.stringify(browserConfig),
   ]);
 
   // Trust loopback proxy so Railway-forwarded requests are treated as local
