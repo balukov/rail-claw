@@ -94,12 +94,15 @@ async function ensureConfig(): Promise<void> {
     JSON.stringify(browserConfig),
   ]);
 
-  // The "coding" tools profile doesn't include browser — extend it via alsoAllow.
+  // The "coding" tools profile lacks `browser` and `message` — extend via alsoAllow.
   // `allow` would REPLACE the profile's list; `alsoAllow` is the additive key.
+  // `message` is required so the agent can call action=upload-file to attach
+  // screenshots/files to Telegram (plain-text replies go through the channel's
+  // built-in reply path and don't need this tool).
   await runCmd("openclaw", ["config", "set", "tools.profile", "coding"]);
   await runCmd("openclaw", [
     "config", "set", "--json", "tools.alsoAllow",
-    JSON.stringify(["browser"]),
+    JSON.stringify(["browser", "message"]),
   ]);
 
   // Trust loopback proxy so Railway-forwarded requests are treated as local
