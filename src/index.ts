@@ -852,6 +852,39 @@ server.listen(PORT, "0.0.0.0", async () => {
     fs.chmodSync(STATE_DIR, 0o700);
   } catch {}
 
+  // Seed AGENTS.md so the agent knows how to attach media correctly.
+  // OpenClaw injects this file into every session.
+  const agentsMdPath = path.join(WORKSPACE_DIR, "AGENTS.md");
+  if (!fs.existsSync(agentsMdPath)) {
+    fs.writeFileSync(
+      agentsMdPath,
+      `# Agent conventions
+
+## Sending media to the user
+
+To attach a file (screenshot, image, PDF) in a chat reply, use ONE of these:
+
+1. **\`message\` tool** with \`action: "upload-file"\`, passing \`filePath\` or
+   \`path\` to a file on disk. Preferred — works across all channels.
+2. **\`MEDIA:<path>\`** on its own line at the end of your reply. \`<path>\`
+   must be an absolute file path or an http(s) URL. Data URIs
+   (\`data:image/...;base64,...\`) are NOT supported and will leak as text.
+
+### Browser screenshots
+
+Capture to a file first (e.g. pass a \`path\` or \`filePath\` to the screenshot
+action), then reference that file. Do NOT inline base64 in the reply text.
+
+Example reply:
+
+\`\`\`
+Here is the screenshot of example.com.
+MEDIA:/tmp/screenshot.png
+\`\`\`
+`,
+    );
+  }
+
   // Auto-onboard if not configured
   if (!isConfigured()) {
     console.log("[snapclaw] first start — auto-onboarding...");
