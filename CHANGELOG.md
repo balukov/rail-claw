@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.1
+
+- Fix Chromium binary resolution in Docker (`chrome-linux64` subdir, not `chrome-linux`)
+- Set `browser.executablePath` to Playwright's bundled Chromium so the gateway finds it on restart
+- Switch tools policy to the `full` profile so the agent has both `browser` and `message` tools (the `coding` profile omits both; `allow` replaces the profile's list, `alsoAllow` extends it)
+- Fix "[object Object]" on the Codex badge by normalizing `agents.defaults.model` when it's an object, not a string
+- Fix Telegram card resurfacing after restart: widen `channelsReady` detection (regex plugin match, `channels.telegram` shape, `devices list` fallback) and persist a sentinel file on successful pairing
+- Show the dashboard/terminal any time the agent is configured, not only when channels are ready, so admin access is always reachable
+
 ## 0.8.0
 
 - Full browser automation support: click, type, fill, navigate, screenshot, PDF export, and more
