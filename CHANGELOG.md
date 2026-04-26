@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.2
+
+- Disable the Bonjour bundled plugin during post-setup config: Railway has no LAN to advertise to (new default-enabled plugin in OpenClaw 2026.4.24)
+- Add optional `OPENCLAW_TELEGRAM_POLL_STALL_MS` env to set `channels.telegram.pollingStallThresholdMs` (configurable since OpenClaw 2026.4.20)
+- Detect Codex onboarding completion by polling for the config file instead of grepping `"Updated openclaw.json"` from PTY stdout — that string is not a contract
+- Bump the example `OPENCLAW_VERSION` in `docker-compose.yml` to `2026.4.24`
+
 ## 0.8.1
 
 - Fix Chromium binary resolution in Docker (`chrome-linux64` subdir, not `chrome-linux`)

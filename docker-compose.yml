@@ -4,7 +4,7 @@ services:
       context: .
       # args:
       #   EXTRA_APT_PACKAGES: "git curl jq"
-      #   OPENCLAW_VERSION: "2026.4.8"
+      #   OPENCLAW_VERSION: "2026.4.24"
     ports:
       - "3000:3000"
     shm_size: "2gb"

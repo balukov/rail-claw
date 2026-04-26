@@ -189,6 +189,18 @@ async function applyPostSetupConfig(): Promise<void> {
     "config", "set", "--json", "gateway.trustedProxies", '["127.0.0.1"]',
   ]);
 
+  // Disable Bonjour: Railway has no LAN to advertise to (openclaw 2026.4.24+)
+  await runCmd("openclaw", [
+    "config", "set", "--json", "plugins.entries.bonjour.enabled", "false",
+  ]);
+
+  const tgPollStallMs = process.env.OPENCLAW_TELEGRAM_POLL_STALL_MS;
+  if (tgPollStallMs && /^\d+$/.test(tgPollStallMs)) {
+    await runCmd("openclaw", [
+      "config", "set", "--json", "channels.telegram.pollingStallThresholdMs", tgPollStallMs,
+    ]);
+  }
+
   // Allow Control UI connections without device pairing
   await runCmd("openclaw", [
     "config", "set", "--json", "gateway.controlUi.dangerouslyDisableDeviceAuth", "true",
@@ -298,8 +310,6 @@ function startCodexSession(): CodexSession {
 
   shell.onData((data: string) => {
     session.output += data;
-    const clean = data.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
-      .replace(/\x1b\][^\x07]*\x07/g, "");
 
     // Capture OAuth URL
     if (!session.oauthUrl) {
@@ -311,15 +321,24 @@ function startCodexSession(): CodexSession {
         console.log("[codex] found OAuth URL:", session.oauthUrl);
       }
     }
+  });
 
-    // Once config is written, auth succeeded — kill the PTY
-    // (onboard may hang on hooks prompt after this)
-    if (clean.includes("Updated") && clean.includes("openclaw.json")) {
+  // Poll for config-file appearance instead of grepping PTY output for
+  // "Updated openclaw.json" — that line is not a contract and could change
+  // upstream without warning. onboard may also hang on a hooks prompt after
+  // writing the config, so we kill the PTY ourselves once the file exists.
+  const configWatcher = setInterval(() => {
+    if (session.status !== "waiting") {
+      clearInterval(configWatcher);
+      return;
+    }
+    if (isConfigured()) {
+      clearInterval(configWatcher);
       console.log("[codex] config written, finishing session");
       session.status = "done";
       setTimeout(() => { try { shell.kill(); } catch {} }, 500);
     }
-  });
+  }, 500);
 
   shell.onExit(({ exitCode }) => {
     session.status = (exitCode === 0 || isConfigured()) ? "done" : "error";
