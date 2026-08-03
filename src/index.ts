@@ -138,6 +138,45 @@ function setGatewayAuth(req: http.IncomingMessage): void {
   }
 }
 
+// Set before any writeHead, so one call covers every response site as well as
+// proxied ones — http-proxy only overwrites names the upstream itself sends.
+function setSecurityHeaders(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): void {
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Frame-Options", "DENY");
+
+  // CSP covers SnapClaw's own pages only. OpenClaw Control is a third-party SPA
+  // whose asset requirements move with upstream releases, so policing it here
+  // would break it on some future version.
+  const url = req.url ?? "/";
+  if (!url.startsWith("/snapclaw") && url !== "/healthz") return;
+
+  // Name the WebSocket origin explicitly: 'self' ought to cover same-origin wss
+  // under CSP3, but support has been uneven and getting it wrong kills the
+  // terminal silently.
+  const host = req.headers.host ?? "";
+  const wsSrc = /^[A-Za-z0-9.\-:]+$/.test(host) ? ` wss://${host}` : "";
+
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'none'",
+      "script-src 'self' https://cdn.jsdelivr.net",
+      "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+      "font-src https://fonts.gstatic.com",
+      "img-src 'self'",
+      `connect-src 'self'${wsSrc}`,
+      "form-action 'self'",
+      "base-uri 'none'",
+      "frame-ancestors 'none'",
+    ].join("; "),
+  );
+}
+
 const publicDir = new URL("../public", import.meta.url).pathname;
 
 function escapeHtml(s: string): string {
@@ -883,6 +922,9 @@ const publicRoutes: Record<string, Handler> = {
   "GET /healthz": handleHealthz,
   "GET /snapclaw/healthz": handleHealthz,
   "GET /snapclaw-icon.png": staticFile("snapclaw-icon.png", "image/png"),
+  // The login page is served to unauthenticated visitors, so its stylesheet
+  // has to be reachable without a session or the page renders unstyled.
+  "GET /snapclaw/login.css": staticFile("login.css", "text/css"),
 };
 
 const setupRoutes: Record<string, Handler> = {
@@ -979,6 +1021,7 @@ async function handleRequest(
 
 const server = http.createServer(async (req, res) => {
   try {
+    setSecurityHeaders(req, res);
     await handleRequest(req, res);
   } catch (err) {
     console.error("[server]", err);
