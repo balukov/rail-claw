@@ -113,6 +113,31 @@ function checkAuth(req: http.IncomingMessage): boolean {
   return false;
 }
 
+// Browsers attach cookies to cross-site WebSocket handshakes and CORS does not
+// apply, so a cookie-gated upgrade is hijackable unless the origin is checked.
+// A missing Origin means a non-browser client, which cross-site hijacking
+// cannot reach.
+function sameOrigin(req: http.IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
+// Replace any client credential with the gateway's own token. checkAuth() may
+// have accepted Basic, whose header carries SETUP_PASSWORD — forwarding it
+// downstream would leak the admin password into the gateway process.
+function setGatewayAuth(req: http.IncomingMessage): void {
+  if (GATEWAY_TOKEN) {
+    req.headers.authorization = `Bearer ${GATEWAY_TOKEN}`;
+  } else {
+    delete req.headers.authorization;
+  }
+}
+
 const publicDir = new URL("../public", import.meta.url).pathname;
 
 function escapeHtml(s: string): string {
@@ -921,6 +946,15 @@ async function handleRequest(
     return;
   }
 
+  // Everything proxied to the gateway requires the setup session. Without this
+  // the token injection below hands an admin credential to any anonymous
+  // caller, exposing OpenClaw Control on the public domain.
+  if (!checkAuth(req)) {
+    res.writeHead(302, { Location: "/snapclaw" });
+    res.end();
+    return;
+  }
+
   // Redirect root to /snapclaw until channels are configured
   if (url === "/" && !channelsReady) {
     res.writeHead(302, { Location: "/snapclaw" });
@@ -936,10 +970,7 @@ async function handleRequest(
     return;
   }
 
-  // Inject gateway auth token
-  if (!req.headers.authorization && GATEWAY_TOKEN) {
-    req.headers.authorization = `Bearer ${GATEWAY_TOKEN}`;
-  }
+  setGatewayAuth(req);
 
   proxy.web(req, res, { target: GATEWAY_TARGET });
 }
@@ -982,9 +1013,12 @@ server.on("upgrade", (req, socket, head) => {
     socket.destroy();
     return;
   }
-  if (!req.headers.authorization && GATEWAY_TOKEN) {
-    req.headers.authorization = `Bearer ${GATEWAY_TOKEN}`;
+  // An upgrade cannot carry a redirect, so refusals close the socket.
+  if (!sameOrigin(req) || !checkAuth(req)) {
+    socket.destroy();
+    return;
   }
+  setGatewayAuth(req);
   proxy.ws(req, socket, head, { target: GATEWAY_TARGET });
 });
 
