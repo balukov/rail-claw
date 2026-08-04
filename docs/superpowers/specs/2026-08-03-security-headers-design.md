@@ -44,11 +44,22 @@ Never applied to proxied gateway responses.
 
 ```
 default-src 'none'; script-src 'self' https://cdn.jsdelivr.net;
-style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com;
+style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com;
 font-src https://fonts.gstatic.com; img-src 'self';
 connect-src 'self' wss://<host>; form-action 'self';
 base-uri 'none'; frame-ancestors 'none'
 ```
+
+`style-src` carries `'unsafe-inline'`. The first deployed version omitted it and broke
+the terminal: xterm.js sizes and themes its viewport by assigning to `element.style` at
+runtime, and CSSOM writes are governed by `style-src` with no hash or nonce escape
+hatch — the hashes the browser suggests cover only that frame's computed text and shift
+with terminal dimensions. Caught by loading the panel in a real browser and reading the
+console; static inspection of the markup could not have found it, because the offending
+styles exist only at runtime.
+
+`script-src` remains strict. That is the directive standing between an injected script
+and the shell, and it is unaffected by this relaxation.
 
 No `'unsafe-inline'`. `public/setup.html` contains no inline `<script>`, no `<style>`
 block, and no `style=` attribute, so the strict form works there as-is. This is the main

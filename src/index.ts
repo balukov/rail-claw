@@ -166,7 +166,12 @@ function setSecurityHeaders(
     [
       "default-src 'none'",
       "script-src 'self' https://cdn.jsdelivr.net",
-      "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+      // 'unsafe-inline' is required: xterm.js sizes and themes the terminal by
+      // assigning to element.style at runtime, and CSSOM writes are governed by
+      // style-src with no hash or nonce escape hatch. Without it the terminal
+      // renders unusable. script-src stays strict, which is the directive that
+      // actually stands between an injected script and the shell.
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
       "font-src https://fonts.gstatic.com",
       "img-src 'self'",
       `connect-src 'self'${wsSrc}`,
