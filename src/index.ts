@@ -184,6 +184,18 @@ function setSecurityHeaders(
 
 const publicDir = new URL("../public", import.meta.url).pathname;
 
+// SnapClaw's own version, as opposed to cachedVersion, which is OpenClaw's.
+// Without this there is no way to tell which release a deployment is running,
+// which matters when a release fixes something operators need to pick up.
+const SNAPCLAW_VERSION = ((): string => {
+  try {
+    const raw = fs.readFileSync(new URL("../package.json", import.meta.url), "utf8");
+    return (JSON.parse(raw) as { version?: string }).version ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+})();
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
@@ -627,6 +639,7 @@ const handleStatus: Handler = async (_req, res) => {
     channelsReady,
     botTokenSet,
     model,
+    snapclawVersion: SNAPCLAW_VERSION,
     openclawVersion: cachedVersion,
     gatewayTarget: GATEWAY_TARGET,
     gatewayRunning: gateway.isRunning(),
@@ -1072,6 +1085,7 @@ server.on("upgrade", (req, socket, head) => {
 
 // Start
 server.listen(PORT, "0.0.0.0", async () => {
+  console.log(`[snapclaw] version: ${SNAPCLAW_VERSION}`);
   console.log(`[snapclaw] listening on :${PORT}`);
   console.log(`[snapclaw] state: ${STATE_DIR}`);
   console.log(`[snapclaw] gateway target: ${GATEWAY_TARGET}`);

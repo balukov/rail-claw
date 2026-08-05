@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.20
+
+- **Deployments now report which SnapClaw version they run.** There was no way to answer "is this instance on the release that fixed X?" — SnapClaw never read its own `package.json`, and the only version it surfaced was `openclawVersion`, which is OpenClaw's. The version is now logged once at boot (so it appears in Railway logs) and returned as `snapclawVersion` from `/snapclaw/api/status`. Deliberately **not** added to the public `/healthz`: that would let anyone scan deployments and enumerate which are running an unpatched release, which matters for a template with many third-party installs.
+
 ## 0.9.19
 
 - **Security: the OpenClaw gateway was reachable without a password.** `checkAuth()` guarded only `/snapclaw*`; every other path fell through to the gateway proxy, which stamped `Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN` onto the request before forwarding it. `SETUP_PASSWORD` never participated, so anyone who knew a deployment's public URL reached OpenClaw Control as an authenticated admin. Confirmed against a live deployment before the fix — an anonymous `GET` returned the Control UI. The root redirect to `/snapclaw` was not a gate: it fires only while channels are unready, and only for `/`. **Action for existing deploys: redeploy to pick this up.** Every gateway-proxied request now requires the setup session (or the Basic-auth path), and unauthenticated requests get the login page.
