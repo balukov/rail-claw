@@ -1,5 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 import {
   STATE_DIR,
   WORKSPACE_DIR,
@@ -9,7 +10,8 @@ import {
   isConfigured,
   configPath,
 } from "./config.js";
-import { ensurePersistentLinks, runCmd, sleep, deepSet } from "./utils.js";
+import { ensurePersistentLinks, runCmd, sleep, deepSet, redactSecrets } from "./utils.js";
+import { needsMigration } from "./upgrade.js";
 
 let proc: ChildProcess | null = null;
 let starting: Promise<void> | null = null;
@@ -255,19 +257,27 @@ function clearStaleBrowserLocks(): void {
   if (cleared > 0) console.log(`[gateway] cleared ${cleared} stale Chromium Singleton lock(s)`);
 }
 
-// Re-own the plugin tree to root via the narrow NOPASSWD sudo helper installed
-// in the Dockerfile (see scripts/own-plugins.sh). The gateway runs as `node`
-// and can't chown to root directly. Best-effort: a failure (e.g. helper absent
-// in local dev) is logged, not fatal.
-async function reownPlugins(): Promise<void> {
+const VERSION_MARKER = path.join(STATE_DIR, "openclaw-version");
+
+async function migrateState(): Promise<void> {
+  const v = await runCmd("openclaw", ["--version"], 10_000);
+  const current = v.code === 0 ? v.output.trim() : "";
+  let marker: string | null = null;
   try {
-    const r = await runCmd("sudo", ["-n", "/usr/local/bin/snapclaw-own-plugins"]);
-    if (r.code !== 0) {
-      console.warn(`[gateway] plugin re-own exited ${r.code}: ${r.output.trim()}`);
-    }
-  } catch (err) {
-    console.warn("[gateway] plugin re-own failed:", err);
+    marker = fs.readFileSync(VERSION_MARKER, "utf8");
+  } catch {}
+  if (!needsMigration(marker, current)) return;
+
+  console.log(`[gateway] ${current} — running state migration (doctor --fix)`);
+  const r = await runCmd("openclaw", ["doctor", "--fix", "--non-interactive"], 300_000);
+  if (r.code !== 0) {
+    console.warn(`[gateway] doctor --fix exited ${r.code}:\n${redactSecrets(r.output)}`);
+    return;
   }
+  try {
+    fs.writeFileSync(VERSION_MARKER, current, "utf8");
+  } catch {}
+  console.log("[gateway] state migration complete");
 }
 
 // Single guarded entry point: concurrent callers (a proxied request via
@@ -292,8 +302,7 @@ async function startInternal(): Promise<void> {
   ensurePersistentLinks();
   clearStaleBrowserLocks();
 
-  // Stop any leftover gateway process before starting
-  await runCmd("openclaw", ["gateway", "stop"]);
+  await migrateState();
 
   // Auto-fix config issues (e.g. plugin schema changes across openclaw versions)
   try {
@@ -328,19 +337,12 @@ async function startInternal(): Promise<void> {
 
   await ensureConfig();
 
-  // Re-own the plugin tree to root before the gateway loads plugins. OpenClaw
-  // 2026.5.27+ blocks plugins not owned by root ("suspicious ownership"), but
-  // onboarding installs the codex plugin as the unprivileged `node` user. The
-  // entrypoint handles this at container boot; this covers the mid-session
-  // case (fresh onboarding) so codex loads without a restart. Best-effort via
-  // a narrow NOPASSWD sudo helper — never blocks gateway start.
-  await reownPlugins();
-
   proc = spawn(
     "openclaw",
     [
       "gateway",
       "run",
+      "--force",
       "--bind",
       "loopback",
       "--port",
