@@ -328,13 +328,6 @@ async function startInternal(): Promise<void> {
   } catch (err) {
     console.warn("[gateway] config auto-fix failed:", err);
   }
-  // Intentionally do NOT run `openclaw doctor --fix` on every boot. It's an
-  // unbounded auto-repair pass: OpenClaw 2026.5.5 doctor rewrote valid
-  // `openai-codex/*` OAuth routes to `openai/*` (reverted in 5.6), and
-  // similar destructive migrations are a recurring risk. Run it manually
-  // (`openclaw doctor --fix`) when something is actually broken. The
-  // targeted config writes in ensureConfig() below cover SnapClaw's needs.
-
   await ensureConfig();
 
   proc = spawn(

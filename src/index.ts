@@ -254,7 +254,7 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
 
 let channelsReady = false;
 let cachedVersion = "";
-let authCache: { value: boolean; at: number } | null = null;
+let authCache: { value: boolean; until: number } | null = null;
 
 const CHANNEL_RE = /telegram|discord|whatsapp/i;
 const CHANNELS_READY_FLAG = path.join(STATE_DIR, ".channels-ready");
@@ -621,15 +621,20 @@ const handleLogin: Handler = async (req, res) => {
 };
 
 async function codexConnected(): Promise<boolean> {
-  if (authCache && Date.now() - authCache.at < 60_000) return authCache.value;
+  if (authCache && Date.now() < authCache.until) return authCache.value;
   const r = await runCmd(
     "openclaw",
     ["models", "auth", "list", "--provider", "openai", "--json"],
     15_000,
   );
   const value = r.code === 0 && countAuthProfiles(r.output) > 0;
-  authCache = { value, at: Date.now() };
+  authCache = { value, until: Date.now() + (value ? 60_000 : 5_000) };
   return value;
+}
+
+async function restartGateway(): Promise<void> {
+  authCache = null;
+  await gateway.restart();
 }
 
 const handleStatus: Handler = async (_req, res) => {
@@ -699,8 +704,8 @@ const handleCodexCallback: Handler = async (req, res) => {
 
   const ok = codexSession.status === "done";
   if (ok) {
-    // gateway.restart() -> ensureConfig() applies all required config.
-    await gateway.restart();
+    // restartGateway() -> ensureConfig() applies all required config.
+    await restartGateway();
   }
   const result = { ok, status: codexSession.status };
   codexSession = null;
@@ -718,7 +723,7 @@ const handleTelegramAdd: Handler = async (req, res) => {
   ]);
   if (r.code === 0) {
     // Token saved — but not yet paired. Don't set channelsReady here.
-    await gateway.restart();
+    await restartGateway();
   }
   sendJson(res, { ok: r.code === 0, output: redactSecrets(r.output) });
 };
@@ -760,7 +765,7 @@ const handleConfigWrite: Handler = async (req, res) => {
     }
   } catch {}
   fs.writeFileSync(p, content, "utf8");
-  await gateway.restart();
+  await restartGateway();
   sendJson(res, { ok: true, path: p });
 };
 
@@ -770,7 +775,7 @@ const handleOnboard: Handler = async (_req, res) => {
   }
   const ok = await autoOnboard();
   if (ok) {
-    await gateway.restart();
+    await restartGateway();
   }
   sendJson(res, { ok, output: ok ? "Configured." : "Onboarding failed." });
 };
@@ -782,8 +787,7 @@ const handleConsoleRun: Handler = async (req, res) => {
 
   const handlers: Record<string, () => Promise<string>> = {
     "gateway.restart": async () => {
-      authCache = null;
-      await gateway.restart();
+      await restartGateway();
       return "Gateway restarted.";
     },
     "gateway.stop": async () => {
@@ -943,7 +947,7 @@ const handleImport: Handler = async (req, res) => {
       req.pipe(extractor);
     });
   } finally {
-    if (isConfigured()) await gateway.restart();
+    if (isConfigured()) await restartGateway();
   }
   sendJson(res, { ok: true, output: "Backup imported." });
 };
