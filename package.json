@@ -8,7 +8,8 @@
     "build:client": "esbuild src/client/setup.ts --bundle --minify --outfile=public/setup.js --format=iife --target=es2020",
     "build:server": "tsc",
     "build": "npm run build:client && npm run build:server",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "npm run build:server && node --test test/upgrade.test.mjs"
   },
   "dependencies": {
     "http-proxy": "^1.18.1",
