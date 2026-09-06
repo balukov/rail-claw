@@ -184,12 +184,6 @@ async function ensureConfig(): Promise<void> {
   // Trust loopback proxy so Railway-forwarded requests are treated as local.
   deepSet(cfg, "gateway.trustedProxies", ["127.0.0.1", "::1"]);
 
-  // Railway terminates TLS at the edge and proxies over HTTP internally, so the
-  // gateway must allow token auth over the loopback HTTP connection.
-  deepSet(cfg, "gateway.controlUi.allowInsecureAuth", true);
-  // Disable device pairing so the Control UI connects without manual approval.
-  deepSet(cfg, "gateway.controlUi.dangerouslyDisableDeviceAuth", true);
-
   // Sync gateway tokens.
   deepSet(cfg, "gateway.auth.mode", "token");
   deepSet(cfg, "gateway.auth.token", GATEWAY_TOKEN);
@@ -211,10 +205,12 @@ async function ensureConfig(): Promise<void> {
   // so existing deploys pick up the disable on upgrade.
   deepSet(cfg, "plugins.entries.bonjour.enabled", false);
 
-  const tgPollStallMs = process.env.OPENCLAW_TELEGRAM_POLL_STALL_MS;
-  if (tgPollStallMs && /^\d+$/.test(tgPollStallMs)) {
-    deepSet(cfg, "channels.telegram.pollingStallThresholdMs", parseInt(tgPollStallMs, 10));
+  const memorySearch = ((cfg.memory as Record<string, unknown> | undefined)?.search ??
+    {}) as Record<string, unknown>;
+  if (memorySearch.provider === undefined) {
+    deepSet(cfg, "memory.search.provider", "none");
   }
+  deepSet(cfg, "update.checkOnStart", false);
 
   // Clean up onboard boilerplate (previously done in applyPostSetupConfig).
   try {
