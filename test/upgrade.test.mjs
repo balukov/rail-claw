@@ -24,6 +24,11 @@ test("countAuthProfiles: tolerates the CLI warning prefix and non-JSON output", 
   assert.equal(countAuthProfiles(none), 0);
   assert.equal(countAuthProfiles("models auth list requires a running gateway"), 0);
   assert.equal(parseJsonTail("no json here"), null);
+  assert.equal(countAuthProfiles(JSON.stringify({ agentId: "main" })), 0);
+  assert.equal(
+    countAuthProfiles("warning: expected shape is {profiles: [...]}\n" + JSON.stringify({ profiles: [{ id: "openai:me" }] })),
+    1,
+  );
 });
 
 test("dashboardFragment: returns the bootstrap fragment only when the token is present", () => {

@@ -255,6 +255,7 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
 let channelsReady = false;
 let cachedVersion = "";
 let authCache: { value: boolean; until: number } | null = null;
+let authProbe: Promise<boolean> | null = null;
 
 const CHANNEL_RE = /telegram|discord|whatsapp/i;
 const CHANNELS_READY_FLAG = path.join(STATE_DIR, ".channels-ready");
@@ -622,14 +623,22 @@ const handleLogin: Handler = async (req, res) => {
 
 async function codexConnected(): Promise<boolean> {
   if (authCache && Date.now() < authCache.until) return authCache.value;
-  const r = await runCmd(
-    "openclaw",
-    ["models", "auth", "list", "--provider", "openai", "--json"],
-    15_000,
-  );
-  const value = r.code === 0 && countAuthProfiles(r.output) > 0;
-  authCache = { value, until: Date.now() + (value ? 60_000 : 5_000) };
-  return value;
+  if (!authProbe) {
+    authProbe = runCmd(
+      "openclaw",
+      ["models", "auth", "list", "--provider", "openai", "--json"],
+      15_000,
+    )
+      .then((r) => {
+        const value = r.code === 0 && countAuthProfiles(r.output) > 0;
+        authCache = { value, until: Date.now() + (value ? 60_000 : 5_000) };
+        return value;
+      })
+      .finally(() => {
+        authProbe = null;
+      });
+  }
+  return authProbe;
 }
 
 async function restartGateway(): Promise<void> {
@@ -829,12 +838,13 @@ const handleConsoleRun: Handler = async (req, res) => {
   }
 
   if (cmd === "openclaw.config.get") {
-    try {
-      const raw = fs.readFileSync(configPath(), "utf8");
-      return sendJson(res, { ok: true, output: redactSecrets(raw) });
-    } catch (err) {
-      return sendJson(res, { ok: false, error: (err as Error).message }, 500);
+    const cfg = readConfig();
+    if (!cfg) return sendJson(res, { ok: false, error: "openclaw.json is unreadable" }, 500);
+    let value: unknown = cfg;
+    for (const key of arg ? arg.split(".") : []) {
+      value = typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined;
     }
+    return sendJson(res, { ok: true, output: redactSecrets(JSON.stringify(value ?? null, null, 2)) });
   }
 
   if (cmd === "openclaw.devices.approve" && arg) {
@@ -969,7 +979,7 @@ const handleDashboard: Handler = async (_req, res) => {
       502,
     );
   }
-  res.writeHead(302, { Location: `/${fragment}` });
+  res.writeHead(302, { Location: `/${fragment}`, "Cache-Control": "no-store" });
   res.end();
 };
 

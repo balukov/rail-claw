@@ -207,9 +207,8 @@ async function ensureConfig(): Promise<void> {
   // so existing deploys pick up the disable on upgrade.
   deepSet(cfg, "plugins.entries.bonjour.enabled", false);
 
-  const memorySearch = ((cfg.memory as Record<string, unknown> | undefined)?.search ??
-    {}) as Record<string, unknown>;
-  if (memorySearch.provider === undefined) {
+  const memory = cfg.memory as { search?: { provider?: unknown } | null } | undefined;
+  if (memory?.search?.provider === undefined) {
     deepSet(cfg, "memory.search.provider", "none");
   }
   deepSet(cfg, "update.checkOnStart", false);
@@ -351,12 +350,6 @@ async function startInternal(): Promise<void> {
         ...process.env,
         OPENCLAW_STATE_DIR: STATE_DIR,
         OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
-        // Ensure gateway can find globally installed plugin deps (grammy, etc.)
-        NODE_PATH: [
-          process.env.NODE_PATH,
-          "/usr/local/lib/node_modules",
-          "/usr/lib/node_modules",
-        ].filter(Boolean).join(":"),
       },
     },
   );

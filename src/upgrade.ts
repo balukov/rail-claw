@@ -1,11 +1,13 @@
-export function parseJsonTail(output: string): unknown | null {
-  const start = output.indexOf("{");
-  if (start < 0) return null;
-  try {
-    return JSON.parse(output.slice(start));
-  } catch {
-    return null;
+export function parseJsonTail(output: string): unknown {
+  let start = output.indexOf("{");
+  while (start >= 0) {
+    try {
+      return JSON.parse(output.slice(start));
+    } catch {
+      start = output.indexOf("{", start + 1);
+    }
   }
+  return null;
 }
 
 export function needsMigration(marker: string | null, current: string): boolean {
