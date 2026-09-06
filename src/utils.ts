@@ -140,7 +140,8 @@ export function redactSecrets(text: string): string {
       "$1[REDACTED]",
     )
     // Authorization: Bearer <token>
-    .replace(/(Bearer\s+)[A-Za-z0-9._-]{10,}/gi, "$1[REDACTED]");
+    .replace(/(Bearer\s+)[A-Za-z0-9._-]{10,}/gi, "$1[REDACTED]")
+    .replace(/(bootstrapToken=)[A-Za-z0-9._~-]+/g, "$1[REDACTED]");
 
   // Redact known literal secrets by exact value, covering tokens (e.g. a
   // custom OPENCLAW_GATEWAY_TOKEN that isn't 64-hex) no generic pattern catches.
