@@ -714,7 +714,7 @@ const handleTelegramAdd: Handler = async (req, res) => {
     return sendJson(res, { ok: false, error: "Invalid bot token format" }, 400);
   }
   const r = await runCmd("openclaw", [
-    "config", "set", "channels.telegram.botToken", token,
+    "channels", "add", "--channel", "telegram", "--token", token,
   ]);
   if (r.code === 0) {
     // Token saved — but not yet paired. Don't set channelsReady here.
@@ -805,7 +805,7 @@ const handleConsoleRun: Handler = async (req, res) => {
   const cliMap: Record<string, string[]> = {
     "openclaw.status": ["gateway", "status"],
     "openclaw.health": ["gateway", "health"],
-    "openclaw.doctor": ["doctor", "--fix"],
+    "openclaw.doctor": ["doctor", "--fix", "--non-interactive"],
     "openclaw.version": ["--version"],
     "openclaw.devices.list": ["devices", "list"],
     "openclaw.plugins.list": ["plugins", "list"],
@@ -820,13 +820,17 @@ const handleConsoleRun: Handler = async (req, res) => {
 
   if (cmd === "openclaw.logs.tail") {
     const n = parseInt(arg) || 50;
-    const r = await runCmd("openclaw", ["gateway", "call", "logs", "--tail", String(n)]);
+    const r = await runCmd("openclaw", ["logs", "--limit", String(n), "--plain"]);
     return sendJson(res, { ok: r.code === 0, output: redactSecrets(r.output) });
   }
 
   if (cmd === "openclaw.config.get") {
-    const r = await runCmd("openclaw", ["config", "get", arg || "."]);
-    return sendJson(res, { ok: r.code === 0, output: redactSecrets(r.output) });
+    try {
+      const raw = fs.readFileSync(configPath(), "utf8");
+      return sendJson(res, { ok: true, output: redactSecrets(raw) });
+    } catch (err) {
+      return sendJson(res, { ok: false, error: (err as Error).message }, 500);
+    }
   }
 
   if (cmd === "openclaw.devices.approve" && arg) {
