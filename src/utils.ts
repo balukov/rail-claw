@@ -31,7 +31,14 @@ function ensureSymlink(linkPath: string, target: string): void {
       // Real directory exists; move aside so the symlink can take its
       // place. Contents in here would have been lost on next redeploy
       // anyway — the rename preserves them for forensic inspection.
-      fs.renameSync(linkPath, `${linkPath}.ephemeral.${Date.now()}`);
+      const ephemeral = `${linkPath}.ephemeral.${Date.now()}`;
+      try {
+        fs.renameSync(linkPath, ephemeral);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "EXDEV") throw err;
+        fs.cpSync(linkPath, ephemeral, { recursive: true });
+        fs.rmSync(linkPath, { recursive: true, force: true });
+      }
       // Don't let these forensic copies accumulate across redeploys.
       pruneOldFiles(path.dirname(linkPath), `${path.basename(linkPath)}.ephemeral.`, 2);
     }
