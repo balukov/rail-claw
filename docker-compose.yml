@@ -4,7 +4,7 @@ services:
       context: .
       # Override the OpenClaw version pinned in the Dockerfile (ARG OPENCLAW_VERSION):
       # args:
-      #   OPENCLAW_VERSION: "2026.5.27"
+      #   OPENCLAW_VERSION: "2026.9.2"
     ports:
       - "3000:3000"
     shm_size: "2gb"
