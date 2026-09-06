@@ -952,6 +952,23 @@ const handleImport: Handler = async (req, res) => {
 // Key: "<METHOD> <exact path>". Public routes need no auth; setup routes sit
 // behind checkAuth(). The login POST is dispatched before the auth gate.
 
+const handleDashboard: Handler = async (_req, res) => {
+  try {
+    await gateway.ensure();
+  } catch {}
+  const r = await runCmd("openclaw", ["dashboard", "--json", "--no-open"], 20_000);
+  const fragment = r.code === 0 ? dashboardFragment(r.output) : null;
+  if (!fragment) {
+    return sendJson(
+      res,
+      { ok: false, error: "Could not mint a Control UI link", output: redactSecrets(r.output) },
+      502,
+    );
+  }
+  res.writeHead(302, { Location: `/${fragment}` });
+  res.end();
+};
+
 const staticFile = (name: string, type: string): Handler => (_req, res) =>
   sendFile(res, path.join(publicDir, name), type);
 
@@ -969,6 +986,7 @@ const setupRoutes: Record<string, Handler> = {
   "GET /snapclaw/setup.js": staticFile("setup.js", "application/javascript"),
   "GET /snapclaw/setup.css": staticFile("setup.css", "text/css"),
   "GET /snapclaw/api/status": handleStatus,
+  "GET /snapclaw/api/dashboard": handleDashboard,
   "POST /snapclaw/api/codex/start": handleCodexStart,
   "POST /snapclaw/api/codex/callback": handleCodexCallback,
   "POST /snapclaw/api/telegram/add": handleTelegramAdd,
