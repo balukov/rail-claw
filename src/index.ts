@@ -24,6 +24,7 @@ import {
 
 import * as gateway from "./gateway.js";
 import { ensurePersistentLinks, runCmd, redactSecrets, sleep, pruneOldFiles } from "./utils.js";
+import { countAuthProfiles, dashboardFragment } from "./upgrade.js";
 
 // --- Auth ---
 
@@ -253,6 +254,7 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
 
 let channelsReady = false;
 let cachedVersion = "";
+let authCache: { value: boolean; at: number } | null = null;
 
 const CHANNEL_RE = /telegram|discord|whatsapp/i;
 const CHANNELS_READY_FLAG = path.join(STATE_DIR, ".channels-ready");
@@ -388,7 +390,7 @@ function startCodexSession(): CodexSession {
   // `openclaw onboard` would rewrite openclaw.json from scratch — wiping
   // the Telegram bot token, pairing state, and anything else the user
   // has already configured. So when a config already exists, use the
-  // narrower `models auth login --provider openai-codex` command, which
+  // narrower `models auth login --provider openai` command, which
   // only refreshes the Codex OAuth profile and leaves the rest alone.
   // (This is exactly what OpenClaw's own "Model login expired" error
   // tells the user to run.)
@@ -396,7 +398,7 @@ function startCodexSession(): CodexSession {
 
   let args: string[];
   if (isReauth) {
-    args = ["models", "auth", "login", "--provider", "openai-codex"];
+    args = ["models", "auth", "login", "--provider", "openai"];
     console.log("[codex] starting re-authentication (config preserved)");
   } else {
     // First-time onboarding: wipe any partial config so onboard doesn't
@@ -411,7 +413,7 @@ function startCodexSession(): CodexSession {
       "--skip-ui",
       "--skip-search",
       "--no-install-daemon",
-      "--auth-choice", "openai-codex",
+      "--auth-choice", "openai",
       "--flow", "quickstart",
       "--mode", "local",
       "--gateway-port", String(INTERNAL_PORT),
@@ -473,6 +475,7 @@ function startCodexSession(): CodexSession {
   }
 
   shell.onExit(({ exitCode }) => {
+    authCache = null;
     if (isReauth) {
       // Re-auth: completion is a clean PTY exit. Config already existed
       // throughout, so isConfigured() isn't a useful signal here.
@@ -617,6 +620,18 @@ const handleLogin: Handler = async (req, res) => {
   return sendLoginPage(res, "Wrong password");
 };
 
+async function codexConnected(): Promise<boolean> {
+  if (authCache && Date.now() - authCache.at < 60_000) return authCache.value;
+  const r = await runCmd(
+    "openclaw",
+    ["models", "auth", "list", "--provider", "openai", "--json"],
+    15_000,
+  );
+  const value = r.code === 0 && countAuthProfiles(r.output) > 0;
+  authCache = { value, at: Date.now() };
+  return value;
+}
+
 const handleStatus: Handler = async (_req, res) => {
   if (!channelsReady) await checkChannelsReady();
   const cfg = readConfig() ?? {};
@@ -629,9 +644,7 @@ const handleStatus: Handler = async (_req, res) => {
   } else if (rawModel) {
     model = rawModel.name ?? rawModel.id ?? rawModel.model ?? rawModel.slug ?? null;
   }
-  // Auth credentials exist (not just a config file)?
-  const profiles = cfg.auth?.profiles;
-  const hasAuth = !!(profiles && Object.keys(profiles).length > 0);
+  const hasAuth = isConfigured() && (await codexConnected());
   sendJson(res, {
     ok: true,
     configured: isConfigured(),
@@ -647,6 +660,7 @@ const handleStatus: Handler = async (_req, res) => {
 };
 
 const handleCodexStart: Handler = async (_req, res) => {
+  authCache = null;
   if (codexSession) {
     try { codexSession.pty.kill(); } catch {}
     codexSession = null;
@@ -768,6 +782,7 @@ const handleConsoleRun: Handler = async (req, res) => {
 
   const handlers: Record<string, () => Promise<string>> = {
     "gateway.restart": async () => {
+      authCache = null;
       await gateway.restart();
       return "Gateway restarted.";
     },

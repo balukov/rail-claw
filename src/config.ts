@@ -132,7 +132,6 @@ export interface OpenclawConfig {
     defaults?: { model?: string | OpenclawModel; [k: string]: unknown };
     [k: string]: unknown;
   };
-  auth?: { profiles?: Record<string, unknown>; [k: string]: unknown };
   commands?: { ownerAllowFrom?: unknown[]; [k: string]: unknown };
   plugins?: {
     entries?: Record<string, unknown>;
