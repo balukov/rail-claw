@@ -110,7 +110,15 @@ No. Railway handles deployment.
 ### Can I update later?
 Yes, just redeploy. Each release pins a tested OpenClaw version, so a redeploy
 updates SnapClaw and rebuilds the same known-good OpenClaw — it can't break your
-bot by pulling an untested OpenClaw out from under you.
+bot by pulling an untested OpenClaw out from under you. When a release moves to a
+newer OpenClaw, the first boot runs OpenClaw's state migration for you (about a
+minute); export a backup from the panel first, because an older release cannot
+read a migrated volume.
+
+### The Web UI says "pairing required"
+Open it from the panel's **Open Web UI** button once per browser. OpenClaw pairs
+browsers now; the button hands yours an owner credential so there is nothing to
+approve.
 
 ## Credits
 
