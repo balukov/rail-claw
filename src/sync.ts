@@ -40,6 +40,18 @@ export async function ensure(): Promise<SyncState> {
   return state();
 }
 
+function scheduleRestart(startedAt: number): void {
+  if (stopping || restartTimer) return;
+  if (Date.now() - startedAt > STABLE_UPTIME_MS) attempt = 0;
+  const delay = nextBackoffMs(attempt);
+  attempt++;
+  console.warn(`[sync] restart in ${delay}ms (attempt #${attempt})`);
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    start();
+  }, delay);
+}
+
 function start(): void {
   if (isRunning() || stopping) return;
   if (restartTimer) {
@@ -57,19 +69,13 @@ function start(): void {
     console.log(`[sync] exited code=${code} signal=${signal}`);
     if (proc === child) proc = null;
     if (stopping) return;
-    if (Date.now() - startedAt > STABLE_UPTIME_MS) attempt = 0;
-    const delay = nextBackoffMs(attempt);
-    attempt++;
-    console.warn(`[sync] restart in ${delay}ms (attempt #${attempt})`);
-    restartTimer = setTimeout(() => {
-      restartTimer = null;
-      start();
-    }, delay);
+    scheduleRestart(startedAt);
   });
 
   child.on("error", (err) => {
     console.error(`[sync] failed to start ob: ${err.message}`);
     if (proc === child) proc = null;
+    scheduleRestart(startedAt);
   });
 }
 
