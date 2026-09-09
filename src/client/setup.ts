@@ -33,7 +33,7 @@ async function httpJson<T = Record<string, unknown>>(
 
 // --- Helpers ---
 
-function setBadge(el: HTMLElement, type: "success" | "pending", text: string): void {
+function setBadge(el: HTMLElement, type: "success" | "pending" | "muted", text: string): void {
   el.innerHTML = "";
   const badge = document.createElement("span");
   badge.className = `status-badge ${type}`;
@@ -64,6 +64,7 @@ interface StatusResponse {
   botTokenSet: boolean;
   model?: string | null;
   openclawVersion?: string;
+  obsidianSync?: "running" | "configured" | "not-configured";
 }
 
 let lastStatus: StatusResponse | null = null;
@@ -113,6 +114,15 @@ function restoreUI(s: StatusResponse): void {
     setBadge($("telegramStatus"), "pending", "Waiting for pairing code...");
     $("telegramPairing").classList.remove("hidden");
   }
+
+  renderSync(s.obsidianSync);
+}
+
+function renderSync(state: StatusResponse["obsidianSync"]): void {
+  const el = $("syncStatus");
+  if (state === "running") setBadge(el, "success", "Syncing");
+  else if (state === "configured") setBadge(el, "pending", "Configured, not running");
+  else setBadge(el, "muted", "Not set up");
 }
 
 // --- Codex OAuth ---
@@ -386,6 +396,22 @@ $("dashRestart").onclick = async () => {
     await refreshStatus();
   } catch (e) {
     out.textContent = `Error: ${e}`;
+  }
+};
+
+$("syncCheckBtn").onclick = async () => {
+  const btn = $("syncCheckBtn") as HTMLButtonElement;
+  setLoading(btn, true, "Checking...");
+  try {
+    const r = await httpJson<{ ok: boolean; state: StatusResponse["obsidianSync"] }>(
+      "/snapclaw/api/sync/ensure",
+      { method: "POST" },
+    );
+    renderSync(r.state);
+  } catch (e) {
+    setBadge($("syncStatus"), "pending", `Error: ${e}`);
+  } finally {
+    setLoading(btn, false, "Check");
   }
 };
 

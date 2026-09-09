@@ -23,6 +23,7 @@ import {
 } from "./config.js";
 
 import * as gateway from "./gateway.js";
+import * as sync from "./sync.js";
 import { ensurePersistentLinks, runCmd, redactSecrets, sleep, pruneOldFiles } from "./utils.js";
 import { countAuthProfiles, dashboardFragment } from "./upgrade.js";
 
@@ -670,6 +671,7 @@ const handleStatus: Handler = async (_req, res) => {
     openclawVersion: cachedVersion,
     gatewayTarget: GATEWAY_TARGET,
     gatewayRunning: gateway.isRunning(),
+    obsidianSync: sync.state(),
   });
 };
 
@@ -872,6 +874,11 @@ const handleMarkReady: Handler = (_req, res) => {
   sendJson(res, { ok: true });
 };
 
+const handleSyncEnsure: Handler = async (_req, res) => {
+  const state = await sync.ensure();
+  sendJson(res, { ok: true, state });
+};
+
 const handlePairingApprove: Handler = async (req, res) => {
   const body = await readJson(req);
   const channel = String(body.channel ?? "").trim();
@@ -1010,6 +1017,7 @@ const setupRoutes: Record<string, Handler> = {
   "POST /snapclaw/api/onboard": handleOnboard,
   "POST /snapclaw/api/console/run": handleConsoleRun,
   "POST /snapclaw/api/channels/mark-ready": handleMarkReady,
+  "POST /snapclaw/api/sync/ensure": handleSyncEnsure,
   "POST /snapclaw/api/pairing/approve": handlePairingApprove,
   "GET /snapclaw/api/devices/pending": handleDevicesPending,
   "POST /snapclaw/api/devices/approve": handleDevicesApprove,
@@ -1176,11 +1184,18 @@ server.listen(PORT, "0.0.0.0", async () => {
       console.error("[snapclaw] gateway failed:", err);
     }
   }
+
+  try {
+    console.log(`[snapclaw] obsidian sync: ${await sync.ensure()}`);
+  } catch (err) {
+    console.error("[snapclaw] obsidian sync check failed:", err);
+  }
 });
 
 process.on("SIGTERM", async () => {
   console.log("[snapclaw] SIGTERM received, shutting down...");
   server.close();
   await gateway.stop();
+  await sync.stop();
   process.exit(0);
 });
