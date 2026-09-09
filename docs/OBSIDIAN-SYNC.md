@@ -41,6 +41,13 @@ and sync state live in `/data/.config/obsidian-headless` on the volume.
 Obsidian → Settings → Sync → connect to remote vault **Brain** → enter the vault
 password. Do the same on the phone.
 
+## If the badge stays "Not set up" after the setup
+
+SnapClaw checks the folder named by the `OPENCLAW_WORKSPACE_DIR` variable. It
+must be the same path you passed to `ob sync-setup` (`/data/.openclaw/workspace`
+on a standard deploy); an older value such as `/data/workspace` makes the panel
+look in an empty folder. Fix the variable in Railway and let the service redeploy.
+
 ## If the badge says "Configured, not running"
 
 The client keeps exiting; the Railway log shows a `[sync] exited code=…` line,

@@ -41,8 +41,9 @@ RUN apt-get update \
     tini gosu \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g obsidian-headless@0.0.14 \
-  && ob --version
+RUN npm install -g --allow-scripts=better-sqlite3 obsidian-headless@0.0.14 \
+  && ob --version \
+  && node -e "require('/usr/local/lib/node_modules/obsidian-headless/node_modules/better-sqlite3')"
 ENV XDG_CONFIG_HOME=/data/.config
 
 # Install Playwright's bundled Chromium for full browser tool support

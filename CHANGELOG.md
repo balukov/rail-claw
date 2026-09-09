@@ -4,6 +4,7 @@
 
 - **Obsidian Sync sidecar.** The image ships `obsidian-headless` 0.0.14. Connect the workspace to a remote vault once over SSH (`ob login`, `ob sync-setup`, see `docs/OBSIDIAN-SYNC.md`) and SnapClaw runs `ob sync --continuous` next to the gateway, restarting it with a 5s–60s backoff. The client's login token and sync state live in `/data/.config/obsidian-headless` (`XDG_CONFIG_HOME=/data/.config`), so they survive redeploys. Hidden folders such as `.git` and `memory/.dreams` are never uploaded.
 - **Panel:** an *Obsidian Sync* row in the Admin card shows `Syncing`, `Configured, not running` or `Not set up`; **Check** calls `POST /snapclaw/api/sync/ensure`, which re-reads the vault configuration and starts the client without a redeploy. `/snapclaw/api/status` gains `obsidianSync`.
+- **Image:** the sync client's `better-sqlite3` addon is installed with `--allow-scripts` (npm 12 blocks install scripts of global packages by default) and the build fails early if the addon cannot be loaded.
 
 ## 0.10.0
 
