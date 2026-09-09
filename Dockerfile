@@ -41,6 +41,10 @@ RUN apt-get update \
     tini gosu \
   && rm -rf /var/lib/apt/lists/*
 
+RUN npm install -g obsidian-headless@0.0.14 \
+  && ob --version
+ENV XDG_CONFIG_HOME=/data/.config
+
 # Install Playwright's bundled Chromium for full browser tool support
 # Per OpenClaw docs: must use bundled playwright-core CLI, NOT npx playwright
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
