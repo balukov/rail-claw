@@ -952,10 +952,11 @@ const handleExport: Handler = async (_req, res) => {
   });
 };
 
-// Import backup. Stop the gateway first so we don't extract over files it
-// has open, and stream straight from the request (no full in-memory buffer).
+// Import backup. Stop the gateway and sync client first so we don't extract
+// over files they have open, and stream straight from the request (no full
+// in-memory buffer).
 const handleImport: Handler = async (req, res) => {
-  await gateway.stop();
+  await Promise.all([gateway.stop(), sync.stop()]);
   try {
     await new Promise<void>((resolve, reject) => {
       const extractor = tar.extract({ cwd: "/data", gzip: true });
@@ -965,6 +966,7 @@ const handleImport: Handler = async (req, res) => {
     });
   } finally {
     if (isConfigured()) await restartGateway();
+    await sync.ensure();
   }
   sendJson(res, { ok: true, output: "Backup imported." });
 };
@@ -1195,7 +1197,6 @@ server.listen(PORT, "0.0.0.0", async () => {
 process.on("SIGTERM", async () => {
   console.log("[snapclaw] SIGTERM received, shutting down...");
   server.close();
-  await gateway.stop();
-  await sync.stop();
+  await Promise.all([gateway.stop(), sync.stop()]);
   process.exit(0);
 });

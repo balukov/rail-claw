@@ -10,7 +10,9 @@ enough: one vault, 1 GB, 5 MB per file).
 
 ## One-time setup
 
-Open a shell in the container as the `node` user:
+Open **Terminal** in the SnapClaw panel (it runs as the `node` user with the
+right environment). If you'd rather use your own shell, `railway ssh` then
+`gosu node sh` gets you the same thing:
 
 ```
 railway ssh
@@ -41,7 +43,8 @@ password. Do the same on the phone.
 
 ## If the badge says "Configured, not running"
 
-The client keeps exiting; the Railway log shows why (`[sync]` lines). The usual
-cause is an expired login: repeat `ob login` over SSH, then press **Check**.
+The client keeps exiting; the Railway log shows a `[sync] exited code=…` line,
+and the client's own output just above it says why. The usual cause is an
+expired login: repeat `ob login` over SSH, then press **Check**.
 `ob sync-status --path /data/.openclaw/workspace` prints the current
 configuration.

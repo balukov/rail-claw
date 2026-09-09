@@ -408,6 +408,11 @@ $("syncCheckBtn").onclick = async () => {
       { method: "POST" },
     );
     renderSync(r.state);
+    try {
+      await new Promise((r) => setTimeout(r, 3000));
+      const s = await httpJson<StatusResponse>("/snapclaw/api/status");
+      renderSync(s.obsidianSync);
+    } catch {}
   } catch (e) {
     setBadge($("syncStatus"), "pending", `Error: ${e}`);
   } finally {
