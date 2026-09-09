@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.0
+
+- **Obsidian Sync sidecar.** The image ships `obsidian-headless` 0.0.14. Connect the workspace to a remote vault once over SSH (`ob login`, `ob sync-setup`, see `docs/OBSIDIAN-SYNC.md`) and SnapClaw runs `ob sync --continuous` next to the gateway, restarting it with a 5s–60s backoff. The client's login token and sync state live in `/data/.config/obsidian-headless` (`XDG_CONFIG_HOME=/data/.config`), so they survive redeploys. Hidden folders such as `.git` and `memory/.dreams` are never uploaded.
+- **Panel:** an *Obsidian Sync* row in the Admin card shows `Syncing`, `Configured, not running` or `Not set up`; **Check** calls `POST /snapclaw/api/sync/ensure`, which re-reads the vault configuration and starts the client without a redeploy. `/snapclaw/api/status` gains `obsidianSync`.
+
 ## 0.10.0
 
 - **OpenClaw 2026.5.27 → 2026.9.2.** Redeploy to pick it up. The first boot runs OpenClaw's own state migration (`openclaw doctor --fix --non-interactive`, about a minute on Railway) and records the OpenClaw version on the volume so it runs once per version, not per boot. Your Telegram pairing and ChatGPT login carry over. **Export a backup from the panel before redeploying** — a 5.27 gateway cannot read a volume that 9.2 has migrated, so the export is the only rollback.
